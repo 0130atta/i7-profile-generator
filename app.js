@@ -510,25 +510,53 @@ function renderNotesEditor() {
 
 function addNote() { state.notes.push({ id: entryId(), title: '', text: '' }); renderNotesEditor(); renderPreview(); }
 
+let pendingPngExport = null;
+
+function canvasToExportBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    if (typeof canvas.toBlob === 'function') {
+      canvas.toBlob((blob) => { if (blob) resolve(blob); else reject(new Error('PNG blob unavailable')); }, 'image/png');
+      return;
+    }
+    try {
+      const dataUrl = canvas.toDataURL('image/png'); const parts = dataUrl.split(','); const binary = window.atob(parts[1]); const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      resolve(new Blob([bytes], { type: 'image/png' }));
+    } catch (error) { reject(error); }
+  });
+}
+
+function triggerPngDownload(pending) {
+  const url = URL.createObjectURL(pending.blob); const link = document.createElement('a'); link.href = url; link.download = pending.name; document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+async function savePendingPngExport() {
+  const pending = pendingPngExport; if (!pending) return;
+  const canShareFiles = typeof File === 'function' && typeof navigator.share === 'function' && (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [new File([pending.blob], pending.name, { type: 'image/png' })] }));
+  if (canShareFiles) {
+    try {
+      await navigator.share({ files: [new File([pending.blob], pending.name, { type: 'image/png' })], title: 'i7 PROFILE' });
+      pendingPngExport = null; elements.exportPng.textContent = '\u5bfc\u51fa PNG'; elements.exportStatus.textContent = '\u5df2\u6253\u5f00\u4fdd\u5b58\u6216\u5206\u4eab\u9762\u677f';
+      return;
+    } catch (error) {
+      if (error && error.name === 'AbortError') { elements.exportStatus.textContent = '\u5df2\u53d6\u6d88\u4fdd\u5b58\uff0c\u53ef\u518d\u6b21\u70b9\u51fb\u201c\u4fdd\u5b58 PNG\u201d'; return; }
+    }
+  }
+  triggerPngDownload(pending); pendingPngExport = null; elements.exportPng.textContent = '\u5bfc\u51fa PNG'; elements.exportStatus.textContent = '\u5df2\u89e6\u53d1 PNG \u4e0b\u8f7d';
+}
+
 async function exportPng() {
+  if (pendingPngExport) { await savePendingPngExport(); return; }
   if (typeof window.html2canvas !== 'function') { elements.exportStatus.textContent = '\u5bfc\u51fa\u7ec4\u4ef6\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5'; return; }
   elements.exportPng.disabled = true; elements.exportStatus.textContent = '\u6b63\u5728\u751f\u6210 PNG\u2026';
   try {
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
-    const width = Math.max(elements.card.scrollWidth, elements.card.offsetWidth, 1);
-    const height = Math.max(elements.card.scrollHeight, elements.card.offsetHeight, 1);
-    const maxPixels = 12000000; const maxDimension = 8192;
-    const scale = Math.min(3, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
-    const canvas = await window.html2canvas(elements.card, { backgroundColor: null, scale: scale, useCORS: true, logging: false });
+    const width = Math.max(elements.card.scrollWidth, elements.card.offsetWidth, 1); const height = Math.max(elements.card.scrollHeight, elements.card.offsetHeight, 1);
+    const maxPixels = 4000000; const maxDimension = 4096; const scale = Math.min(2, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
+    const canvas = await window.html2canvas(elements.card, { backgroundColor: null, scale: scale, useCORS: true, logging: false }); const blob = await canvasToExportBlob(canvas);
     const link = document.createElement('a'); const name = (state.name.trim() || 'i7-profile').replace(/[\\/:*?"<>|]/g, '_');
-    const download = (url) => {
-      const link = document.createElement('a'); link.href = url; link.download = `${name}-profile.png`; document.body.append(link); link.click(); link.remove();
-      if (url.indexOf('blob:') === 0) setTimeout(() => URL.revokeObjectURL(url), 0);
-    };
-    if (typeof canvas.toBlob === 'function') {
-      await new Promise((resolve, reject) => canvas.toBlob((blob) => { if (!blob) { reject(new Error('\u65e0\u6cd5\u751f\u6210 PNG')); return; } download(URL.createObjectURL(blob)); resolve(); }, 'image/png'));
-    } else download(canvas.toDataURL('image/png'));
-    elements.exportStatus.textContent = scale < 3 ? '\u6761\u76ee\u8f83\u591a\uff0c\u5df2\u4f18\u5316\u5e76\u4e0b\u8f7d PNG' : 'PNG \u5df2\u4e0b\u8f7d';
+    pendingPngExport = { blob: blob, name: `${name}-profile.png` }; elements.exportPng.textContent = '\u4fdd\u5b58 PNG'; elements.exportStatus.textContent = scale < 2 ? '\u6761\u76ee\u8f83\u591a\uff0c\u5df2\u4f18\u5316 PNG\uff1b\u8bf7\u518d\u6b21\u70b9\u51fb\u201c\u4fdd\u5b58 PNG\u201d' : 'PNG \u5df2\u751f\u6210\uff0c\u8bf7\u70b9\u51fb\u201c\u4fdd\u5b58 PNG\u201d';
   } catch (error) {
     console.error(error); elements.exportStatus.textContent = '\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5';
   } finally { elements.exportPng.disabled = false; }
