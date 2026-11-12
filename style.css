@@ -95,7 +95,9 @@ input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px
 .color-picker-label input { width: 34px; height: 27px; padding: 2px; border-radius: 6px; cursor: pointer; }
 .color-picker-label input:disabled { cursor: not-allowed; opacity: .45; }
 .quick-color-controls { display: flex; align-items: center; gap: 5px; margin-left: 10px; }
+.saved-color-slot { display: flex; align-items: center; gap: 5px; }
 .quick-color-button { width: 23px; height: 23px; padding: 0; border: 1px solid #aab5c7; border-radius: 50%; background: var(--quick-color); }
+.saved-color-button { box-shadow: 0 0 0 2px #eef2fb; }
 .quick-color-button:focus-visible { outline: 3px solid rgba(82, 115, 204, .28); outline-offset: 2px; }
 .draft-entry { display: flex; align-items: center; gap: 9px; min-height: 24px; }
 .entry-list-heading { margin: 18px 0 8px; color: #566176; font-size: 12px; font-weight: 700; }
