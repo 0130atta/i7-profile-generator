@@ -56,7 +56,8 @@ const elements = {
   previewCharacter: document.querySelector('#previewCharacter'), previewGroup: document.querySelector('#previewGroup'), previewCp: document.querySelector('#previewCp'),
   workspace: document.querySelector('.workspace'), mobileViewButtons: document.querySelectorAll('[data-workspace-view]'),
   visibilityButtons: document.querySelectorAll('[data-preview-module]'), notesEditor: document.querySelector('#notesEditor'), addNote: document.querySelector('#addNoteButton'),
-  profileHeader: document.querySelector('#profileHeader'), profileHeaderDivider: document.querySelector('#profileHeaderDivider'), previewCharacterSection: document.querySelector('#previewCharacterSection'), previewGroupSection: document.querySelector('#previewGroupSection'), previewCpSection: document.querySelector('#previewCpSection'), previewNotesSection: document.querySelector('#previewNotesSection'), previewNotes: document.querySelector('#previewNotes')
+  profileHeader: document.querySelector('#profileHeader'), profileHeaderDivider: document.querySelector('#profileHeaderDivider'), previewCharacterSection: document.querySelector('#previewCharacterSection'), previewGroupSection: document.querySelector('#previewGroupSection'), previewCpSection: document.querySelector('#previewCpSection'), previewNotesSection: document.querySelector('#previewNotesSection'), previewNotes: document.querySelector('#previewNotes'),
+  exportPng: document.querySelector('#exportPngButton'), exportStatus: document.querySelector('#exportStatus')
 };
 
 function characterById(id) { return characters.find((character) => character.id === id); }
@@ -401,6 +402,20 @@ function renderNotesEditor() {
 
 function addNote() { state.notes.push({ id: entryId(), title: '', text: '' }); renderNotesEditor(); renderPreview(); }
 
+async function exportPng() {
+  if (typeof window.html2canvas !== 'function') { elements.exportStatus.textContent = '导出组件加载失败，请刷新后重试'; return; }
+  elements.exportPng.disabled = true; elements.exportStatus.textContent = '正在生成 PNG…';
+  try {
+    if (document.fonts?.ready) await document.fonts.ready;
+    const canvas = await window.html2canvas(elements.card, { backgroundColor: null, scale: 3, useCORS: true, logging: false });
+    const link = document.createElement('a'); const name = (state.name.trim() || 'i7-profile').replace(/[\\/:*?"<>|]/g, '_');
+    link.href = canvas.toDataURL('image/png'); link.download = `${name}-profile.png`; document.body.append(link); link.click(); link.remove();
+    elements.exportStatus.textContent = 'PNG 已下载';
+  } catch (error) {
+    console.error(error); elements.exportStatus.textContent = '导出失败，请刷新后重试';
+  } finally { elements.exportPng.disabled = false; }
+}
+
 function renderMobileView() {
   elements.workspace.dataset.mobileView = state.mobileView;
   elements.mobileViewButtons.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.workspaceView === state.mobileView)));
@@ -434,6 +449,7 @@ elements.cpSwap.addEventListener('click', () => { if (state.cp.selected.length !
 elements.mobileViewButtons.forEach((button) => button.addEventListener('click', () => { state.mobileView = button.dataset.workspaceView; renderMobileView(); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
 elements.visibilityButtons.forEach((button) => button.addEventListener('click', () => { const module = button.dataset.previewModule; state.visibility[module] = !state.visibility[module]; renderPreviewVisibility(); }));
 elements.addNote.addEventListener('click', addNote);
+elements.exportPng.addEventListener('click', exportPng);
 document.querySelector('#resetButton').addEventListener('click', reset);
 
 renderAll();
