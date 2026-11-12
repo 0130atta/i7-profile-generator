@@ -7,7 +7,7 @@
     <title>i7 属性卡生成器</title>
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
+  <body class="disclaimer-open">
     <main class="app-shell">
       <header class="site-header">
         <div>
@@ -54,9 +54,19 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel color-legend-panel">
             <div class="panel-title-row">
               <span class="section-index">02</span>
+              <h3>态度颜色说明</h3>
+              <span class="hint">选择态度后自动加入</span>
+              <button class="preview-toggle" type="button" data-preview-module="legend" aria-pressed="true">预览中显示</button>
+            </div>
+            <div class="color-legend-editor" id="colorLegendEditor" aria-live="polite"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title-row">
+              <span class="section-index">03</span>
               <h3>角色喜好</h3>
               <span class="hint">选择角色、态度后确认</span>
               <button class="preview-toggle" type="button" data-preview-module="character" aria-pressed="true">预览中显示</button>
@@ -70,6 +80,7 @@
               <div id="characterAttitudeChips" class="chip-grid" aria-label="选择角色态度"></div>
               <div class="attitude-controls">
                 <label class="color-picker-label">标签颜色 <input id="characterColorInput" type="color" value="#e15b64" aria-label="角色态度标签颜色" /></label>
+                <div class="quick-color-controls" aria-label="角色态度快捷颜色"><button type="button" class="quick-color-button" style="--quick-color:#000000" data-color-target="character" data-color="#000000" aria-label="选择黑色" title="黑色"></button><button type="button" class="quick-color-button" style="--quick-color:#ffffff" data-color-target="character" data-color="#ffffff" aria-label="选择白色" title="白色"></button><button type="button" class="quick-color-button" style="--quick-color:#e15b64" data-color-target="character" data-color="#e15b64" aria-label="选择红色" title="红色"></button><button type="button" class="quick-color-button" style="--quick-color:#e6a23c" data-color-target="character" data-color="#e6a23c" aria-label="选择橙色" title="橙色"></button><button type="button" class="quick-color-button" style="--quick-color:#d2a526" data-color-target="character" data-color="#d2a526" aria-label="选择黄色" title="黄色"></button><button type="button" class="quick-color-button" style="--quick-color:#429276" data-color-target="character" data-color="#429276" aria-label="选择绿色" title="绿色"></button><button type="button" class="quick-color-button" style="--quick-color:#9a64bd" data-color-target="character" data-color="#9a64bd" aria-label="选择紫色" title="紫色"></button></div>
               </div>
               <div class="custom-row">
                 <input id="characterAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自定义态度词" />
@@ -86,7 +97,7 @@
 
           <section class="panel">
             <div class="panel-title-row">
-              <span class="section-index">03</span>
+              <span class="section-index">04</span>
               <h3>团体喜好</h3>
               <span class="hint">选择组合、态度后确认</span>
               <button class="preview-toggle" type="button" data-preview-module="group" aria-pressed="true">预览中显示</button>
@@ -94,12 +105,16 @@
             <div class="cp-step">
               <p><b>1</b> 选择组合</p>
               <div id="groupChips" class="group-logo-grid" aria-label="选择组合"></div>
+              <div class="custom-row" id="otherGroupRow" hidden>
+                <input id="otherGroupInput" type="text" maxlength="20" placeholder="填写其他团体名称" />
+              </div>
             </div>
             <div class="cp-step">
               <p><b>2</b> 选择态度与颜色</p>
               <div id="groupAttitudeChips" class="chip-grid" aria-label="选择组合态度"></div>
               <div class="attitude-controls">
                 <label class="color-picker-label">标签颜色 <input id="groupColorInput" type="color" value="#e15b64" aria-label="组合态度标签颜色" /></label>
+                <div class="quick-color-controls" aria-label="组合态度快捷颜色"><button type="button" class="quick-color-button" style="--quick-color:#000000" data-color-target="group" data-color="#000000" aria-label="选择黑色" title="黑色"></button><button type="button" class="quick-color-button" style="--quick-color:#ffffff" data-color-target="group" data-color="#ffffff" aria-label="选择白色" title="白色"></button><button type="button" class="quick-color-button" style="--quick-color:#e15b64" data-color-target="group" data-color="#e15b64" aria-label="选择红色" title="红色"></button><button type="button" class="quick-color-button" style="--quick-color:#e6a23c" data-color-target="group" data-color="#e6a23c" aria-label="选择橙色" title="橙色"></button><button type="button" class="quick-color-button" style="--quick-color:#d2a526" data-color-target="group" data-color="#d2a526" aria-label="选择黄色" title="黄色"></button><button type="button" class="quick-color-button" style="--quick-color:#429276" data-color-target="group" data-color="#429276" aria-label="选择绿色" title="绿色"></button><button type="button" class="quick-color-button" style="--quick-color:#9a64bd" data-color-target="group" data-color="#9a64bd" aria-label="选择紫色" title="紫色"></button></div>
               </div>
               <div class="custom-row">
                 <input id="groupAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自定义态度词" />
@@ -116,7 +131,7 @@
 
           <section class="panel">
             <div class="panel-title-row">
-              <span class="section-index">04</span>
+              <span class="section-index">05</span>
               <h3>CP 词条生成</h3>
               <span class="hint">先选左位，再选右位</span>
               <button class="preview-toggle" type="button" data-preview-module="cp" aria-pressed="true">预览中显示</button>
@@ -135,6 +150,7 @@
                 <div id="cpPreferenceChips" class="chip-grid" aria-label="选择个人态度"></div>
                 <div class="attitude-controls">
                   <label class="color-picker-label">标签颜色 <input id="cpColorInput" type="color" value="#8a64c8" aria-label="CP 态度标签颜色" /></label>
+                  <div class="quick-color-controls" aria-label="CP 态度快捷颜色"><button type="button" class="quick-color-button" style="--quick-color:#000000" data-color-target="cp" data-color="#000000" aria-label="选择黑色" title="黑色"></button><button type="button" class="quick-color-button" style="--quick-color:#ffffff" data-color-target="cp" data-color="#ffffff" aria-label="选择白色" title="白色"></button><button type="button" class="quick-color-button" style="--quick-color:#e15b64" data-color-target="cp" data-color="#e15b64" aria-label="选择红色" title="红色"></button><button type="button" class="quick-color-button" style="--quick-color:#e6a23c" data-color-target="cp" data-color="#e6a23c" aria-label="选择橙色" title="橙色"></button><button type="button" class="quick-color-button" style="--quick-color:#d2a526" data-color-target="cp" data-color="#d2a526" aria-label="选择黄色" title="黄色"></button><button type="button" class="quick-color-button" style="--quick-color:#429276" data-color-target="cp" data-color="#429276" aria-label="选择绿色" title="绿色"></button><button type="button" class="quick-color-button" style="--quick-color:#9a64bd" data-color-target="cp" data-color="#9a64bd" aria-label="选择紫色" title="紫色"></button></div>
                 </div>
                 <div class="custom-row">
                   <input id="cpAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自己的态度词" />
@@ -159,6 +175,7 @@
                 <div id="cpTripleAttitudeChips" class="chip-grid" aria-label="选择多人组合态度"></div>
                 <div class="attitude-controls">
                   <label class="color-picker-label">标签颜色 <input id="cpTripleColorInput" type="color" value="#8a64c8" aria-label="多人组合态度标签颜色" /></label>
+                  <div class="quick-color-controls" aria-label="多人组合态度快捷颜色"><button type="button" class="quick-color-button" style="--quick-color:#000000" data-color-target="cp-triple" data-color="#000000" aria-label="选择黑色" title="黑色"></button><button type="button" class="quick-color-button" style="--quick-color:#ffffff" data-color-target="cp-triple" data-color="#ffffff" aria-label="选择白色" title="白色"></button><button type="button" class="quick-color-button" style="--quick-color:#e15b64" data-color-target="cp-triple" data-color="#e15b64" aria-label="选择红色" title="红色"></button><button type="button" class="quick-color-button" style="--quick-color:#e6a23c" data-color-target="cp-triple" data-color="#e6a23c" aria-label="选择橙色" title="橙色"></button><button type="button" class="quick-color-button" style="--quick-color:#d2a526" data-color-target="cp-triple" data-color="#d2a526" aria-label="选择黄色" title="黄色"></button><button type="button" class="quick-color-button" style="--quick-color:#429276" data-color-target="cp-triple" data-color="#429276" aria-label="选择绿色" title="绿色"></button><button type="button" class="quick-color-button" style="--quick-color:#9a64bd" data-color-target="cp-triple" data-color="#9a64bd" aria-label="选择紫色" title="紫色"></button></div>
                 </div>
                 <div class="custom-row">
                   <input id="cpTripleAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自定义态度词" />
@@ -176,7 +193,7 @@
 
           <section class="panel notes-panel">
             <div class="panel-title-row">
-              <span class="section-index">05</span>
+              <span class="section-index">06</span>
               <h3>备注栏</h3>
               <button class="preview-toggle" type="button" data-preview-module="notes" aria-pressed="true">预览中显示</button>
             </div>
@@ -206,6 +223,11 @@
               </div>
 
               <div class="card-divider" id="profileHeaderDivider"></div>
+
+              <section class="card-section" id="previewLegendSection">
+                <h3><span>LEGEND</span><b>态度颜色说明</b></h3>
+                <div class="preview-color-legend" id="previewColorLegend"></div>
+              </section>
 
               <section class="card-section" id="previewCharacterSection">
                 <h3><span>CHARACTER</span><b>角色喜好</b></h3>
@@ -238,6 +260,26 @@
         </aside>
       </div>
     </main>
+
+    <div class="disclaimer-overlay" id="disclaimerDialog" role="dialog" aria-modal="true" aria-labelledby="disclaimerTitle">
+      <section class="disclaimer-dialog">
+        <p class="disclaimer-kicker">PLEASE READ</p>
+        <h2 id="disclaimerTitle">宇宙免责声明</h2>
+        <div class="disclaimer-content">
+          <p>你好，这是一个i7属性生成卡小工具，请遵守以下说明使用：</p>
+          <ol>
+            <li>生成出来的东西别发给作者。bug反馈和功能要求请针对具体模块说明，作者属性赤石，不想知道任何人的。</li>
+            <li>该工具主要使用了ai agent辅助制作，网页代码属于开源资源领域，如果您对此有精神洁癖或无法接受类似ai应用请退出。</li>
+            <li>网页部署位置在github，可能遇到加载不完等类似问题，请多进入几次试试。</li>
+            <li>选项卡可以自由选择是否在预览卡中显示，开关位于右上角处。</li>
+            <li>有些操作较为卡手处，可以研究一下点击逻辑。</li>
+            <li>不要在里面发布任何的违规文本。别害我。</li>
+          </ol>
+          <p class="feedback-email"><b>反馈邮箱：</b><a href="mailto:xiaoxiaohe130@163.com">xiaoxiaohe130@163.com</a><span>（请在标题备注反馈。）</span></p>
+        </div>
+        <button class="disclaimer-confirm" id="confirmDisclaimerButton" type="button">我已阅读并确认</button>
+      </section>
+    </div>
 
     <template id="chipTemplate">
       <button class="chip" type="button" aria-pressed="false"></button>
