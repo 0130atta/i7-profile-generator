@@ -58,7 +58,8 @@
             <div class="panel-title-row">
               <span class="section-index">02</span>
               <h3>态度颜色说明</h3>
-              <span class="hint">选择态度后自动加入</span>
+              <span class="hint">手动添加已使用的颜色</span>
+              <button class="legend-add-button" id="addColorLegendButton" type="button">添加颜色词条</button>
               <button class="preview-toggle" type="button" data-preview-module="legend" aria-pressed="true">预览中显示</button>
             </div>
             <div class="color-legend-editor" id="colorLegendEditor" aria-live="polite"></div>
@@ -278,6 +279,21 @@
           <p class="feedback-email"><b>反馈邮箱：</b><a href="mailto:xiaoxiaohe130@163.com">xiaoxiaohe130@163.com</a><span>（请在标题备注反馈。）</span></p>
         </div>
         <button class="disclaimer-confirm" id="confirmDisclaimerButton" type="button">我已阅读并确认</button>
+      </section>
+    </div>
+
+    <div class="disclaimer-overlay" id="colorLegendDialog" role="dialog" aria-modal="true" aria-labelledby="colorLegendDialogTitle" hidden>
+      <section class="disclaimer-dialog color-legend-dialog">
+        <p class="disclaimer-kicker">COLOR LEGEND</p>
+        <h2 id="colorLegendDialogTitle">添加颜色词条</h2>
+        <p class="color-legend-dialog-hint">仅显示下方已生成词条中实际使用过的颜色。</p>
+        <div class="legend-color-choices" id="legendColorChoices" aria-label="选择颜色"></div>
+        <label class="legend-note-label" for="legendNoteInput">颜色说明</label>
+        <input id="legendNoteInput" type="text" maxlength="30" placeholder="例如：最喜欢" />
+        <div class="legend-dialog-actions">
+          <button class="outline-button" id="cancelColorLegendButton" type="button">取消</button>
+          <button class="disclaimer-confirm" id="confirmColorLegendButton" type="button">添加</button>
+        </div>
       </section>
     </div>
 
