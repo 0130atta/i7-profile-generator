@@ -580,75 +580,121 @@ function wrapCanvasText(context, text, maxWidth) {
   return lines.length ? lines : [''];
 }
 
-function drawExportAvatar(context, image, x, y, size, borderColor, fallback) {
-  context.save(); context.fillStyle = '#f3f6ff'; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2); context.fill();
-  if (image) { context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 2, 0, Math.PI * 2); context.clip(); context.drawImage(image, x + 2, y + 2, size - 4, size - 4); }
-  context.restore(); context.strokeStyle = borderColor || '#5477ce'; context.lineWidth = 2; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 1, 0, Math.PI * 2); context.stroke();
-  if (!image) { context.fillStyle = borderColor || '#5477ce'; context.font = '700 15px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(fallback || 'i7', x + size / 2, y + size / 2); }
+function drawExportContainedImage(context, image, x, y, width, height) {
+  const imageWidth = image && (image.width || image.naturalWidth); const imageHeight = image && (image.height || image.naturalHeight);
+  if (!imageWidth || !imageHeight) return;
+  const ratio = Math.min(width / imageWidth, height / imageHeight); const drawWidth = imageWidth * ratio; const drawHeight = imageHeight * ratio;
+  context.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
-function drawExportTag(context, label, color, x, y, maxWidth) {
-  context.font = '700 15px sans-serif'; const text = truncateCanvasText(context, label, maxWidth - 22); const width = Math.min(maxWidth, context.measureText(text).width + 22);
-  roundedRect(context, x, y, width, 28, 14); context.fillStyle = '#f5f8ff'; context.fill(); context.strokeStyle = color; context.lineWidth = 1; context.stroke(); context.fillStyle = color; context.textBaseline = 'middle'; context.fillText(text, x + 11, y + 14);
+function drawExportAvatar(context, image, x, y, size, borderColor, fallback) {
+  context.save(); context.fillStyle = '#f3f6ff'; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2); context.fill();
+  if (image) { context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 2, 0, Math.PI * 2); context.clip(); drawExportContainedImage(context, image, x + 2, y + 2, size - 4, size - 4); }
+  context.restore(); context.strokeStyle = borderColor || '#5477ce'; context.lineWidth = 2; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 1, 0, Math.PI * 2); context.stroke();
+  if (!image) { context.fillStyle = borderColor || '#5477ce'; context.font = '700 15px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(fallback || 'i7', x + size / 2, y + size / 2); context.textAlign = 'left'; context.textBaseline = 'alphabetic'; }
+}
+
+function drawExportSideBadge(context, side, color, x, y) {
+  context.fillStyle = color; context.beginPath(); context.arc(x, y, 10, 0, Math.PI * 2); context.fill(); context.fillStyle = '#fff'; context.font = '700 11px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(side, x, y + 1); context.textAlign = 'left'; context.textBaseline = 'alphabetic';
+}
+
+function exportTagMetrics(context, label, maxWidth) {
+  context.font = '700 20px sans-serif'; const text = truncateCanvasText(context, label || '', Math.max(30, maxWidth - 30)); return { text: text, width: Math.min(maxWidth, context.measureText(text).width + 30), height: 44 };
+}
+
+function drawExportTag(context, metrics, color, x, y) {
+  roundedRect(context, x, y, metrics.width, metrics.height, metrics.height / 2); context.fillStyle = '#f8faff'; context.fill(); context.strokeStyle = color; context.lineWidth = 2; context.stroke(); context.fillStyle = color; context.font = '700 20px sans-serif'; context.textBaseline = 'middle'; context.fillText(metrics.text, x + 15, y + metrics.height / 2); context.textBaseline = 'alphabetic';
+}
+
+function drawExportGroupLogo(context, image, label, color, x, y) {
+  roundedRect(context, x, y, 116, 52, 10); context.fillStyle = '#f8faff'; context.fill(); context.strokeStyle = color; context.lineWidth = 2; context.stroke();
+  if (image) drawExportContainedImage(context, image, x + 8, y + 7, 100, 38);
+  else { context.fillStyle = color; context.font = '700 16px sans-serif'; context.textBaseline = 'middle'; context.fillText(truncateCanvasText(context, label || '??', 94), x + 11, y + 27); context.textBaseline = 'alphabetic'; }
+}
+
+function mergeExportEntries(items) {
+  const byAttitude = new Map();
+  items.forEach((entry) => { const matches = byAttitude.get(entry.attitude) || []; matches.push(entry); byAttitude.set(entry.attitude, matches); });
+  return Array.from(byAttitude.keys()).map((attitude) => ({ attitude: attitude, entries: byAttitude.get(attitude) }));
+}
+
+function getExportEntryBlocks(section) {
+  if (section.type !== 'cp') return [{ groups: mergeExportEntries(section.items), separated: false }];
+  const blocks = []; [1, 2, 'multi'].forEach((count) => {
+    const entries = section.items.filter((entry) => count === 'multi' ? entry.characters.length >= 3 : entry.characters.length === count);
+    if (entries.length) blocks.push({ groups: mergeExportEntries(entries), separated: blocks.length > 0 });
+  });
+  return blocks;
+}
+
+function layoutExportEntries(context, section, images, startY, width, padding, draw) {
+  const right = width - padding; const gap = 7; let x = padding; let y = startY; let rowHeight = 0;
+  const finishRow = () => { if (rowHeight) { y += rowHeight; x = padding; rowHeight = 0; } };
+  const place = (cellWidth, cellHeight, painter) => {
+    if (x > padding && x + cellWidth > right) finishRow();
+    if (draw && painter) painter(x, y); x += cellWidth + gap; rowHeight = Math.max(rowHeight, cellHeight);
+  };
+  const placeAvatar = (entry, characterId, index) => {
+    const character = characterById(characterId); const image = character && images && images.get(character.image); const noColorBorder = section.type === 'cp' && entry.characters.length === 1;
+    place(54, 54, (cellX, cellY) => { drawExportAvatar(context, image, cellX, cellY, 52, noColorBorder ? '#ffffff' : entry.color, 'i7'); if (section.type === 'cp' && entry.characters.length === 2 && !entry.nonDirectional) drawExportSideBadge(context, index === 0 ? '?' : '?', entry.color, cellX + 48, cellY + 48); });
+  };
+  const placeEntry = (entry) => {
+    if (section.type === 'group') {
+      const group = groupById(entry.characters[0]); const label = (entry.groupNames && entry.groupNames[entry.characters[0]]) || (group && group.label) || '??'; place(122, 52, (cellX, cellY) => drawExportGroupLogo(context, group && images && images.get(group.image), label, entry.color, cellX, cellY)); return;
+    }
+    entry.characters.forEach((characterId, index) => { placeAvatar(entry, characterId, index); if (section.type === 'cp' && entry.characters.length === 2 && index === 0) place(20, 54, (cellX, cellY) => { context.fillStyle = '#71809a'; context.font = '700 20px sans-serif'; context.textBaseline = 'middle'; context.fillText(entry.nonDirectional ? '?' : '?', cellX, cellY + 27); context.textBaseline = 'alphabetic'; }); });
+  };
+  const blocks = getExportEntryBlocks(section);
+  if (!blocks.length || !section.items.length) { if (draw) { context.fillStyle = '#71809a'; context.font = '500 22px sans-serif'; context.fillText('??????', padding, y + 26); } return y + 48; }
+  blocks.forEach((block) => {
+    if (block.separated) { finishRow(); if (draw) { context.setLineDash([6, 6]); context.strokeStyle = '#e4eaf5'; context.beginPath(); context.moveTo(padding, y + 8); context.lineTo(right, y + 8); context.stroke(); context.setLineDash([]); } y += 24; }
+    block.groups.forEach((group) => {
+      group.entries.forEach(placeEntry); const metrics = exportTagMetrics(context, group.attitude, right - padding); place(metrics.width, metrics.height, (cellX, cellY) => drawExportTag(context, metrics, group.entries[0].color || '#5477ce', cellX, cellY + 4)); finishRow(); y += 12;
+    });
+  });
+  return y;
 }
 
 async function createProfileExportCanvas() {
-  const measureCanvas = document.createElement('canvas'); const measure = measureCanvas.getContext('2d'); const width = 900; const padding = 42; const bodyWidth = width - padding * 2;
+  const measureCanvas = document.createElement('canvas'); const measure = measureCanvas.getContext('2d'); const width = 840; const padding = 52; const bodyWidth = width - padding * 2;
   const sections = [];
-  if (state.visibility.legend && state.colorLegend.length) sections.push({ type: 'legend', title: '态度颜色说明', kicker: 'LEGEND', items: state.colorLegend });
-  if (state.visibility.character) sections.push({ type: 'character', title: '角色喜好', kicker: 'CHARACTER', items: state.character.entries });
-  if (state.visibility.group) sections.push({ type: 'group', title: '团体喜好', kicker: 'GROUP', items: state.group.entries });
-  if (state.visibility.cp) sections.push({ type: 'cp', title: '角色 / CP 词条', kicker: 'PAIRING', items: state.cp.entries });
-  if (state.visibility.notes && state.notes.length) sections.push({ type: 'notes', title: '备注', kicker: 'NOTES', items: state.notes });
-  let height = state.visibility.personal ? 186 : 50;
-  measure.font = '500 14px sans-serif';
+  if (state.visibility.legend && state.colorLegend.length) sections.push({ type: 'legend', title: '??????', kicker: 'LEGEND', items: state.colorLegend });
+  if (state.visibility.character) sections.push({ type: 'character', title: '????', kicker: 'CHARACTER', items: state.character.entries });
+  if (state.visibility.group) sections.push({ type: 'group', title: '????', kicker: 'GROUP', items: state.group.entries });
+  if (state.visibility.cp) sections.push({ type: 'cp', title: '?? / CP ??', kicker: 'PAIRING', items: state.cp.entries });
+  if (state.visibility.notes && state.notes.length) sections.push({ type: 'notes', title: '??', kicker: 'NOTES', items: state.notes });
+  let height = state.visibility.personal ? 246 : 36;
   sections.forEach((section) => {
-    height += 44;
-    if (section.type === 'legend') height += section.items.length * 32;
-    else if (section.type === 'notes') section.items.forEach((item) => { height += 38 + wrapCanvasText(measure, item.text || '未填写内容', bodyWidth - 26).length * 20; });
-    else height += Math.max(1, section.items.length) * 56;
-    height += 10;
+    height += 52;
+    if (section.type === 'legend') height += section.items.length * 42;
+    else if (section.type === 'notes') section.items.forEach((item) => { measure.font = '500 20px sans-serif'; height += 48 + wrapCanvasText(measure, item.text || '?????', bodyWidth - 32).length * 27; });
+    else height = layoutExportEntries(measure, section, null, height, width, padding, false);
+    height += 18;
   });
-  height += 70;
-  const maxPixels = 4000000; const maxDimension = 4096;
-  const scale = Math.min(2, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
-  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.floor(width * scale)); canvas.height = Math.max(1, Math.floor(height * scale));
-  const context = canvas.getContext('2d'); context.scale(scale, scale); context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height); context.fillStyle = '#5477ce'; context.fillRect(0, 0, width, 9);
-  const imageSources = [];
-  if (state.avatar) imageSources.push(state.avatar);
+  height += 72;
+  const maxPixels = 4000000; const maxDimension = 4096; const scale = Math.min(2, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
+  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.floor(width * scale)); canvas.height = Math.max(1, Math.floor(height * scale)); const context = canvas.getContext('2d'); context.scale(scale, scale);
+  context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height); context.fillStyle = '#5477ce'; context.fillRect(0, 0, width, 12);
+  const imageSources = []; if (state.avatar) imageSources.push(state.avatar);
   state.character.entries.concat(state.cp.entries).forEach((entry) => entry.characters.forEach((id) => { const character = characterById(id); if (character) imageSources.push(character.image); }));
   state.group.entries.forEach((entry) => entry.characters.forEach((id) => { const group = groupById(id); if (group && group.image) imageSources.push(group.image); }));
-  const uniqueImageSources = Array.from(new Set(imageSources)); const images = new Map();
-  for (let imageIndex = 0; imageIndex < uniqueImageSources.length; imageIndex += 1) images.set(uniqueImageSources[imageIndex], await loadExportImage(uniqueImageSources[imageIndex]));
-  let y = 30;
+  const images = new Map(); const uniqueImageSources = Array.from(new Set(imageSources)); for (let index = 0; index < uniqueImageSources.length; index += 1) images.set(uniqueImageSources[index], await loadExportImage(uniqueImageSources[index]));
+  let y = 36;
   if (state.visibility.personal) {
-    drawExportAvatar(context, images.get(state.avatar), padding, y, 92, '#5477ce', 'i7'); context.fillStyle = '#5477ce'; context.font = '700 13px sans-serif'; context.fillText('FAN PROFILE', padding + 118, y + 22);
-    context.fillStyle = '#263452'; context.font = '700 30px sans-serif'; context.fillText(truncateCanvasText(context, state.name.trim() || '你的昵称', bodyWidth - 125), padding + 118, y + 64);
-    context.fillStyle = '#71809a'; context.font = '500 15px sans-serif'; const bioLines = wrapCanvasText(context, state.bio.trim() || '在编辑区填写信息，生成属于你的属性卡。', bodyWidth - 125); bioLines.slice(0, 2).forEach((line, index) => context.fillText(line, padding + 118, y + 91 + index * 21)); y += 132;
+    drawExportAvatar(context, images.get(state.avatar), padding, y, 140, '#5477ce', 'i7'); context.fillStyle = '#5477ce'; context.font = '700 16px sans-serif'; context.fillText('FAN PROFILE', padding + 170, y + 25);
+    context.fillStyle = '#263452'; context.font = '700 36px sans-serif'; context.fillText(truncateCanvasText(context, state.name.trim() || '????', bodyWidth - 180), padding + 170, y + 76);
+    context.fillStyle = '#71809a'; context.font = '500 20px sans-serif'; const bioLines = wrapCanvasText(context, state.bio.trim() || '???????????????????', bodyWidth - 180); bioLines.slice(0, 2).forEach((line, index) => context.fillText(line, padding + 170, y + 108 + index * 28)); y = 246;
   }
   sections.forEach((section) => {
-    context.strokeStyle = '#e4eaf5'; context.lineWidth = 1; context.beginPath(); context.moveTo(padding, y); context.lineTo(width - padding, y); context.stroke(); y += 28;
-    context.fillStyle = '#5477ce'; context.font = '700 12px sans-serif'; context.fillText(section.kicker, padding, y); context.fillStyle = '#263452'; context.font = '700 18px sans-serif'; context.fillText(section.title, padding + 88, y); y += 18;
+    context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.beginPath(); context.moveTo(padding, y); context.lineTo(width - padding, y); context.stroke(); context.fillStyle = '#5477ce'; context.font = '700 14px sans-serif'; context.fillText(section.kicker, padding, y + 30); context.fillStyle = '#263452'; context.font = '700 24px sans-serif'; context.fillText(section.title, padding + 116, y + 30); y += 52;
     if (section.type === 'legend') {
-      section.items.forEach((item) => { context.fillStyle = item.color; context.beginPath(); context.arc(padding + 7, y + 10, 7, 0, Math.PI * 2); context.fill(); context.fillStyle = '#71809a'; context.font = '500 14px sans-serif'; context.fillText(truncateCanvasText(context, item.note.trim() || '未填写说明', bodyWidth - 30), padding + 25, y + 15); y += 32; });
+      section.items.forEach((item) => { context.fillStyle = item.color; context.beginPath(); context.arc(padding + 9, y + 16, 9, 0, Math.PI * 2); context.fill(); context.fillStyle = '#71809a'; context.font = '500 20px sans-serif'; context.fillText(truncateCanvasText(context, item.note.trim() || '?????', bodyWidth - 38), padding + 32, y + 23); y += 42; });
     } else if (section.type === 'notes') {
-      section.items.forEach((item) => { roundedRect(context, padding, y, bodyWidth, 30 + wrapCanvasText(measure, item.text || '未填写内容', bodyWidth - 26).length * 20, 8); context.fillStyle = '#f5f8ff'; context.fill(); context.strokeStyle = '#e4eaf5'; context.stroke(); context.fillStyle = '#263452'; context.font = '700 14px sans-serif'; context.fillText(truncateCanvasText(context, item.title.trim() || '备注', bodyWidth - 22), padding + 13, y + 20); context.fillStyle = '#71809a'; context.font = '500 14px sans-serif'; const lines = wrapCanvasText(context, item.text.trim() || '未填写内容', bodyWidth - 26); lines.forEach((line, index) => context.fillText(line, padding + 13, y + 43 + index * 20)); y += 38 + lines.length * 20; });
-    } else if (!section.items.length) {
-      context.fillStyle = '#71809a'; context.font = '500 14px sans-serif'; context.fillText('尚未生成词条', padding, y + 18); y += 56;
-    } else {
-      section.items.forEach((entry) => {
-        let x = padding; const color = entry.color || '#5477ce';
-        entry.characters.forEach((id, index) => {
-          if (section.type === 'group') {
-            const group = groupById(id); roundedRect(context, x, y, 78, 34, 7); context.fillStyle = '#f8faff'; context.fill(); context.strokeStyle = color; context.stroke(); const groupImage = group && images.get(group.image); if (groupImage) context.drawImage(groupImage, x + 6, y + 5, 66, 24); else { context.fillStyle = color; context.font = '700 11px sans-serif'; context.fillText(truncateCanvasText(context, (entry.groupNames && entry.groupNames[id]) || (group && group.label) || '团体', 60), x + 8, y + 21); } x += 86;
-          } else { const character = characterById(id); drawExportAvatar(context, character && images.get(character.image), x, y, 38, entry.characters.length === 1 ? '#ffffff' : color, 'i7'); x += 45; if (entry.characters.length === 2 && index === 0) { context.fillStyle = '#71809a'; context.font = '700 16px sans-serif'; context.fillText(entry.nonDirectional ? '×' : '→', x, y + 24); x += 24; } }
-        });
-        drawExportTag(context, entry.attitude, color, Math.min(x + 8, width - padding - 160), y + 4, width - padding - Math.min(x + 8, width - padding - 160)); y += 56;
-      });
-    }
-    y += 10;
+      section.items.forEach((item) => { context.font = '500 20px sans-serif'; const lines = wrapCanvasText(context, item.text.trim() || '?????', bodyWidth - 32); const boxHeight = 48 + lines.length * 27; roundedRect(context, padding, y, bodyWidth, boxHeight, 12); context.fillStyle = '#f5f8ff'; context.fill(); context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.stroke(); context.fillStyle = '#263452'; context.font = '700 20px sans-serif'; context.fillText(truncateCanvasText(context, item.title.trim() || '??', bodyWidth - 28), padding + 16, y + 28); context.fillStyle = '#71809a'; context.font = '500 20px sans-serif'; lines.forEach((line, index) => context.fillText(line, padding + 16, y + 57 + index * 27)); y += boxHeight; });
+    } else y = layoutExportEntries(context, section, images, y, width, padding, true);
+    y += 18;
   });
-  context.strokeStyle = '#e4eaf5'; context.beginPath(); context.moveTo(padding, height - 52); context.lineTo(width - padding, height - 52); context.stroke(); context.fillStyle = '#71809a'; context.font = '700 11px sans-serif'; context.fillText('i7 PROFILE', padding, height - 27); context.textAlign = 'right'; context.fillText('made by atta', width - padding, height - 27); context.textAlign = 'left';
+  context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.beginPath(); context.moveTo(padding, height - 52); context.lineTo(width - padding, height - 52); context.stroke(); context.fillStyle = '#71809a'; context.font = '700 14px sans-serif'; context.fillText('i7 PROFILE', padding, height - 24); context.textAlign = 'right'; context.fillText('made by atta', width - padding, height - 24); context.textAlign = 'left';
   return { canvas: canvas, scale: scale, height: height };
 }
 
