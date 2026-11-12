@@ -58,7 +58,7 @@ const elements = {
   card: document.querySelector('#profileCard'), cardName: document.querySelector('#cardName'), cardBio: document.querySelector('#cardBio'), cardAvatar: document.querySelector('#cardAvatar'),
   previewCharacter: document.querySelector('#previewCharacter'), previewGroup: document.querySelector('#previewGroup'), previewCp: document.querySelector('#previewCp'),
   workspace: document.querySelector('.workspace'), mobileViewButtons: document.querySelectorAll('[data-workspace-view]'),
-  quickColorButtons: document.querySelectorAll('[data-color-target]'), savedColorSlots: document.querySelectorAll('[data-saved-color-slot]'), colorLegendEditor: document.querySelector('#colorLegendEditor'),
+  quickColorButtons: document.querySelectorAll('[data-color-target]'), savedColorSlots: document.querySelectorAll('[data-saved-color-slot]'), colorLegendEditor: document.querySelector('#colorLegendEditor'), addColorLegend: document.querySelector('#addColorLegendButton'), colorLegendDialog: document.querySelector('#colorLegendDialog'), legendColorChoices: document.querySelector('#legendColorChoices'), legendNoteInput: document.querySelector('#legendNoteInput'), confirmColorLegend: document.querySelector('#confirmColorLegendButton'), cancelColorLegend: document.querySelector('#cancelColorLegendButton'),
   visibilityButtons: document.querySelectorAll('[data-preview-module]'), notesEditor: document.querySelector('#notesEditor'), addNote: document.querySelector('#addNoteButton'),
   profileHeader: document.querySelector('#profileHeader'), profileHeaderDivider: document.querySelector('#profileHeaderDivider'), previewLegendSection: document.querySelector('#previewLegendSection'), previewColorLegend: document.querySelector('#previewColorLegend'), previewCharacterSection: document.querySelector('#previewCharacterSection'), previewGroupSection: document.querySelector('#previewGroupSection'), previewCpSection: document.querySelector('#previewCpSection'), previewNotesSection: document.querySelector('#previewNotesSection'), previewNotes: document.querySelector('#previewNotes'),
   exportPng: document.querySelector('#exportPngButton'), exportStatus: document.querySelector('#exportStatus'),
@@ -135,19 +135,13 @@ function currentColor(section) {
 }
 
 const presetColors = ['#000000', '#ffffff', '#e15b64', '#e6a23c', '#d2a526', '#429276', '#9a64bd'];
+let selectedLegendColor = '';
 
 function normalizedColor(color) { return color.toLowerCase(); }
 
 function saveCustomColor(color) {
   const normalized = normalizedColor(color);
   if (!presetColors.includes(normalized) && !state.savedColors.includes(normalized)) { state.savedColors.push(normalized); renderSavedColorButtons(); }
-}
-
-function syncColorLegend(source, attitude, color) {
-  if (!attitude) return;
-  const normalized = normalizedColor(color); const existing = state.colorLegend.find((item) => item.id === normalized);
-  if (!existing) state.colorLegend.push({ id: normalized, color: normalized, note: '颜色说明' });
-  renderColorLegendEditor(); renderPreview();
 }
 
 function applyQuickColor(colorTarget, color) {
@@ -167,7 +161,7 @@ function renderSavedColorButtons() {
 
 function renderColorLegendEditor() {
   elements.colorLegendEditor.replaceChildren();
-  if (!state.colorLegend.length) { const empty = document.createElement('p'); empty.className = 'color-legend-empty'; empty.textContent = '选择任意态度后，颜色说明会显示在这里。'; elements.colorLegendEditor.append(empty); return; }
+  if (!state.colorLegend.length) { const empty = document.createElement('p'); empty.className = 'color-legend-empty'; empty.textContent = '点击“添加颜色词条”后，选择已生成词条中使用的颜色。'; elements.colorLegendEditor.append(empty); return; }
   state.colorLegend.forEach((item, index) => {
     const row = document.createElement('div'); row.className = 'color-legend-item';
     const swatch = document.createElement('span'); swatch.className = 'legend-swatch'; swatch.style.backgroundColor = item.color; swatch.setAttribute('aria-label', `颜色 ${item.color}`);
@@ -181,6 +175,34 @@ function renderColorLegendEditor() {
     remove.addEventListener('click', () => { state.colorLegend = state.colorLegend.filter((legend) => legend.id !== item.id); renderColorLegendEditor(); renderPreview(); });
     controls.append(up, down, remove); row.append(swatch, text, controls); elements.colorLegendEditor.append(row);
   });
+}
+
+function usedEntryColors() {
+  const colors = [...state.character.entries, ...state.group.entries, ...state.cp.entries].map((entry) => normalizedColor(entry.color));
+  return [...new Set(colors)];
+}
+
+function renderLegendColorChoices() {
+  const colors = usedEntryColors(); elements.legendColorChoices.replaceChildren();
+  const available = colors.filter((color) => !state.colorLegend.some((item) => item.id === color));
+  if (!available.length) { const empty = document.createElement('p'); empty.className = 'color-legend-empty'; empty.textContent = colors.length ? '这些已使用颜色都已有说明。' : '请先在下方模块确认生成至少一个词条。'; elements.legendColorChoices.append(empty); selectedLegendColor = ''; elements.confirmColorLegend.disabled = true; return; }
+  if (!available.includes(selectedLegendColor)) selectedLegendColor = available[0];
+  available.forEach((color) => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'legend-color-choice'; button.style.setProperty('--legend-color', color); button.setAttribute('aria-pressed', String(selectedLegendColor === color)); button.title = color; button.setAttribute('aria-label', `选择颜色 ${color}`);
+    button.addEventListener('click', () => { selectedLegendColor = color; renderLegendColorChoices(); }); elements.legendColorChoices.append(button);
+  });
+  elements.confirmColorLegend.disabled = false;
+}
+
+function openColorLegendDialog() {
+  selectedLegendColor = ''; elements.legendNoteInput.value = ''; renderLegendColorChoices(); elements.colorLegendDialog.hidden = false; document.body.classList.add('disclaimer-open');
+}
+
+function closeColorLegendDialog() { elements.colorLegendDialog.hidden = true; document.body.classList.remove('disclaimer-open'); }
+
+function addColorLegend() {
+  if (!selectedLegendColor || state.colorLegend.some((item) => item.id === selectedLegendColor)) return;
+  state.colorLegend.push({ id: selectedLegendColor, color: selectedLegendColor, note: elements.legendNoteInput.value }); renderColorLegendEditor(); renderPreview(); closeColorLegendDialog();
 }
 
 function renderPreviewColorLegend() {
@@ -204,7 +226,6 @@ function renderAttitudePicker(section) {
       item.attitude = item.attitude === value ? '' : value;
       colorInput.value = currentColor(section); renderAttitudePicker(section);
       section === 'character' ? renderCharacterDraft() : section === 'group' ? renderGroupDraft() : renderCpDraft();
-      if (item.attitude) syncColorLegend(section, item.attitude, currentColor(section));
     });
     container.append(button);
   });
@@ -218,14 +239,12 @@ function addCustomAttitude(section) {
   if (!value || [...builtIn, ...item.customAttitudes].includes(value)) return;
   item.customAttitudes.push(value); item.colors[value] = '#5273cc'; item.attitude = value; input.value = '';
   renderAttitudePicker(section); section === 'character' ? renderCharacterDraft() : section === 'group' ? renderGroupDraft() : renderCpDraft();
-  syncColorLegend(section, item.attitude, currentColor(section));
 }
 
 function updateAttitudeColor(section, color, saveColor = false) {
   const item = state[section]; if (!item.attitude) return;
   const normalized = normalizedColor(color); if (saveColor) saveCustomColor(normalized); item.colors[item.attitude] = normalized; renderAttitudePicker(section);
   section === 'character' ? renderCharacterDraft() : section === 'group' ? renderGroupDraft() : renderCpDraft();
-  syncColorLegend(section, item.attitude, normalized);
 }
 
 function singleStatusColor() { return state.cp.singleColors[state.cp.singleStatus] || '#5273cc'; }
@@ -236,7 +255,7 @@ function renderSingleStatuses() {
   values.forEach((value) => {
     const button = document.createElement('button'); button.className = 'chip attitude-chip'; button.type = 'button'; button.textContent = value;
     button.setAttribute('aria-pressed', String(state.cp.singleStatus === value)); button.style.setProperty('--attitude-color', state.cp.singleColors[value] || '#5273cc');
-    button.addEventListener('click', () => { state.cp.singleStatus = state.cp.singleStatus === value ? '' : value; renderSingleStatuses(); renderCpDraft(); if (state.cp.singleStatus) syncColorLegend('cp-single', state.cp.singleStatus, singleStatusColor()); });
+    button.addEventListener('click', () => { state.cp.singleStatus = state.cp.singleStatus === value ? '' : value; renderSingleStatuses(); renderCpDraft(); });
     elements.cpSingleStatuses.append(button);
   });
 }
@@ -245,7 +264,7 @@ function addSingleCustomStatus() {
   const value = elements.cpSingleCustomInput.value.trim();
   if (!value || ['左位固定', '右位固定', '梦思考固定', ...state.cp.singleCustomStatuses].includes(value)) return;
   state.cp.singleCustomStatuses.push(value); state.cp.singleColors[value] = '#5273cc'; state.cp.singleStatus = value; elements.cpSingleCustomInput.value = '';
-  renderSingleStatuses(); renderCpDraft(); syncColorLegend('cp-single', state.cp.singleStatus, singleStatusColor());
+  renderSingleStatuses(); renderCpDraft();
 }
 
 function tripleStatusColor() { return state.cp.tripleColors[state.cp.tripleStatus] || '#5273cc'; }
@@ -276,7 +295,7 @@ function renderTripleAttitudes() {
   values.forEach((value) => {
     const button = document.createElement('button'); button.className = 'chip attitude-chip'; button.type = 'button'; button.textContent = value;
     button.setAttribute('aria-pressed', String(state.cp.tripleAttitude === value)); button.style.setProperty('--attitude-color', state.cp.tripleAttitudeColors[value] || '#5273cc');
-    button.addEventListener('click', () => { state.cp.tripleAttitude = state.cp.tripleAttitude === value ? '' : value; elements.cpTripleColor.value = tripleAttitudeColor(); renderTripleAttitudes(); renderCpDraft(); if (state.cp.tripleAttitude) syncColorLegend('cp-triple', state.cp.tripleAttitude, tripleAttitudeColor()); });
+    button.addEventListener('click', () => { state.cp.tripleAttitude = state.cp.tripleAttitude === value ? '' : value; elements.cpTripleColor.value = tripleAttitudeColor(); renderTripleAttitudes(); renderCpDraft(); });
     elements.cpTripleAttitudes.append(button);
   });
   elements.cpTripleColor.value = tripleAttitudeColor(); elements.cpTripleColor.disabled = !state.cp.tripleAttitude;
@@ -286,12 +305,12 @@ function addTripleCustomAttitude() {
   const value = elements.cpTripleAttitudeCustomInput.value.trim();
   if (!value || [...data.cpAttitudes, ...state.cp.tripleCustomAttitudes].includes(value)) return;
   state.cp.tripleCustomAttitudes.push(value); state.cp.tripleAttitudeColors[value] = '#5273cc'; state.cp.tripleAttitude = value; elements.cpTripleAttitudeCustomInput.value = '';
-  renderTripleAttitudes(); renderCpDraft(); syncColorLegend('cp-triple', state.cp.tripleAttitude, tripleAttitudeColor());
+  renderTripleAttitudes(); renderCpDraft();
 }
 
 function updateTripleAttitudeColor(color, saveColor = false) {
   if (!state.cp.tripleAttitude) return;
-  const normalized = normalizedColor(color); if (saveColor) saveCustomColor(normalized); state.cp.tripleAttitudeColors[state.cp.tripleAttitude] = normalized; renderTripleAttitudes(); renderCpDraft(); syncColorLegend('cp-triple', state.cp.tripleAttitude, normalized);
+  const normalized = normalizedColor(color); if (saveColor) saveCustomColor(normalized); state.cp.tripleAttitudeColors[state.cp.tripleAttitude] = normalized; renderTripleAttitudes(); renderCpDraft();
 }
 
 function renderCpMode() {
@@ -544,6 +563,10 @@ elements.cpSwap.addEventListener('click', () => { if (state.cp.selected.length !
 elements.mobileViewButtons.forEach((button) => button.addEventListener('click', () => { state.mobileView = button.dataset.workspaceView; renderMobileView(); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
 elements.visibilityButtons.forEach((button) => button.addEventListener('click', () => { const module = button.dataset.previewModule; state.visibility[module] = !state.visibility[module]; renderPreviewVisibility(); }));
 elements.addNote.addEventListener('click', addNote);
+elements.addColorLegend.addEventListener('click', openColorLegendDialog);
+elements.cancelColorLegend.addEventListener('click', closeColorLegendDialog);
+elements.confirmColorLegend.addEventListener('click', addColorLegend);
+elements.legendNoteInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addColorLegend(); } });
 elements.exportPng.addEventListener('click', exportPng);
 elements.confirmDisclaimer.addEventListener('click', () => { elements.disclaimerDialog.hidden = true; document.body.classList.remove('disclaimer-open'); });
 document.querySelector('#resetButton').addEventListener('click', reset);
