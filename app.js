@@ -35,7 +35,7 @@ const defaultColors = {
 };
 
 const state = {
-  name: '', bio: '', avatar: '', mobileView: 'editor', visibility: { personal: true, legend: true, character: true, group: true, cp: true, notes: true }, colorLegend: [], notes: [],
+  name: '', bio: '', avatar: '', mobileView: 'editor', visibility: { personal: true, legend: true, character: true, group: true, cp: true, notes: true }, colorLegend: [], savedColors: [], notes: [],
   character: { selected: '', attitude: '', customAttitudes: [], colors: { ...defaultColors.character }, entries: [] },
   group: { selected: '', otherName: '', attitude: '', customAttitudes: [], colors: { ...defaultColors.group }, entries: [] },
   cp: { selected: [], attitude: '', customAttitudes: [], colors: { ...defaultColors.cp }, entries: [], nonDirectional: false, singleStatus: '', singleCustomStatuses: [], singleColors: { ...defaultColors.single }, tripleStatus: '', tripleCustomStatuses: [], tripleColors: { ...defaultColors.triple }, tripleAttitude: '', tripleCustomAttitudes: [], tripleAttitudeColors: { ...defaultColors.cp } }
@@ -56,7 +56,7 @@ const elements = {
   card: document.querySelector('#profileCard'), cardName: document.querySelector('#cardName'), cardBio: document.querySelector('#cardBio'), cardAvatar: document.querySelector('#cardAvatar'),
   previewCharacter: document.querySelector('#previewCharacter'), previewGroup: document.querySelector('#previewGroup'), previewCp: document.querySelector('#previewCp'),
   workspace: document.querySelector('.workspace'), mobileViewButtons: document.querySelectorAll('[data-workspace-view]'),
-  quickColorButtons: document.querySelectorAll('[data-color-target]'), colorLegendEditor: document.querySelector('#colorLegendEditor'),
+  quickColorButtons: document.querySelectorAll('[data-color-target]'), savedColorSlots: document.querySelectorAll('[data-saved-color-slot]'), colorLegendEditor: document.querySelector('#colorLegendEditor'),
   visibilityButtons: document.querySelectorAll('[data-preview-module]'), notesEditor: document.querySelector('#notesEditor'), addNote: document.querySelector('#addNoteButton'),
   profileHeader: document.querySelector('#profileHeader'), profileHeaderDivider: document.querySelector('#profileHeaderDivider'), previewLegendSection: document.querySelector('#previewLegendSection'), previewColorLegend: document.querySelector('#previewColorLegend'), previewCharacterSection: document.querySelector('#previewCharacterSection'), previewGroupSection: document.querySelector('#previewGroupSection'), previewCpSection: document.querySelector('#previewCpSection'), previewNotesSection: document.querySelector('#previewNotesSection'), previewNotes: document.querySelector('#previewNotes'),
   exportPng: document.querySelector('#exportPngButton'), exportStatus: document.querySelector('#exportStatus'),
@@ -112,14 +112,35 @@ function currentColor(section) {
   const item = state[section]; return item.colors[item.attitude] || '#5273cc';
 }
 
-const legendSourceNames = { character: '角色', group: '组合', cp: 'CP', 'cp-triple': '多人 CP', 'cp-single': '单人词条' };
+const presetColors = ['#000000', '#ffffff', '#e15b64', '#e6a23c', '#d2a526', '#429276', '#9a64bd'];
+
+function normalizedColor(color) { return color.toLowerCase(); }
+
+function saveCustomColor(color) {
+  const normalized = normalizedColor(color);
+  if (!presetColors.includes(normalized) && !state.savedColors.includes(normalized)) { state.savedColors.push(normalized); renderSavedColorButtons(); }
+}
 
 function syncColorLegend(source, attitude, color) {
   if (!attitude) return;
-  const id = `${source}:${attitude}`; const existing = state.colorLegend.find((item) => item.id === id);
-  if (existing) { existing.color = color; }
-  else state.colorLegend.push({ id, color, note: `${legendSourceNames[source]} · ${attitude}` });
+  const normalized = normalizedColor(color); const existing = state.colorLegend.find((item) => item.id === normalized);
+  if (!existing) state.colorLegend.push({ id: normalized, color: normalized, note: '颜色说明' });
   renderColorLegendEditor(); renderPreview();
+}
+
+function applyQuickColor(colorTarget, color) {
+  if (colorTarget === 'cp-triple') { elements.cpTripleColor.value = color; updateTripleAttitudeColor(color); return; }
+  const colorInput = colorTarget === 'character' ? elements.characterColor : colorTarget === 'group' ? elements.groupColor : elements.cpColor;
+  colorInput.value = color; updateAttitudeColor(colorTarget, color);
+}
+
+function renderSavedColorButtons() {
+  elements.savedColorSlots.forEach((slot) => {
+    slot.replaceChildren(); state.savedColors.forEach((color) => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-color-button saved-color-button'; button.style.setProperty('--quick-color', color); button.dataset.colorTarget = slot.dataset.savedColorSlot; button.dataset.color = color; button.title = color; button.setAttribute('aria-label', `使用已保存颜色 ${color}`);
+      button.addEventListener('click', () => applyQuickColor(button.dataset.colorTarget, button.dataset.color)); slot.append(button);
+    });
+  });
 }
 
 function renderColorLegendEditor() {
@@ -178,11 +199,11 @@ function addCustomAttitude(section) {
   syncColorLegend(section, item.attitude, currentColor(section));
 }
 
-function updateAttitudeColor(section, color) {
+function updateAttitudeColor(section, color, saveColor = false) {
   const item = state[section]; if (!item.attitude) return;
-  item.colors[item.attitude] = color; renderAttitudePicker(section);
+  const normalized = normalizedColor(color); if (saveColor) saveCustomColor(normalized); item.colors[item.attitude] = normalized; renderAttitudePicker(section);
   section === 'character' ? renderCharacterDraft() : section === 'group' ? renderGroupDraft() : renderCpDraft();
-  syncColorLegend(section, item.attitude, color);
+  syncColorLegend(section, item.attitude, normalized);
 }
 
 function singleStatusColor() { return state.cp.singleColors[state.cp.singleStatus] || '#5273cc'; }
@@ -246,9 +267,9 @@ function addTripleCustomAttitude() {
   renderTripleAttitudes(); renderCpDraft(); syncColorLegend('cp-triple', state.cp.tripleAttitude, tripleAttitudeColor());
 }
 
-function updateTripleAttitudeColor(color) {
+function updateTripleAttitudeColor(color, saveColor = false) {
   if (!state.cp.tripleAttitude) return;
-  state.cp.tripleAttitudeColors[state.cp.tripleAttitude] = color; renderTripleAttitudes(); renderCpDraft(); syncColorLegend('cp-triple', state.cp.tripleAttitude, color);
+  const normalized = normalizedColor(color); if (saveColor) saveCustomColor(normalized); state.cp.tripleAttitudeColors[state.cp.tripleAttitude] = normalized; renderTripleAttitudes(); renderCpDraft(); syncColorLegend('cp-triple', state.cp.tripleAttitude, normalized);
 }
 
 function renderCpMode() {
@@ -468,7 +489,7 @@ function renderMobileView() {
 }
 
 function reset() {
-  state.name = ''; state.bio = ''; state.avatar = ''; state.mobileView = 'editor'; state.visibility = { personal: true, legend: true, character: true, group: true, cp: true, notes: true }; state.colorLegend = []; state.notes = [];
+  state.name = ''; state.bio = ''; state.avatar = ''; state.mobileView = 'editor'; state.visibility = { personal: true, legend: true, character: true, group: true, cp: true, notes: true }; state.colorLegend = []; state.savedColors = []; state.notes = [];
   state.character = { selected: '', attitude: '', customAttitudes: [], colors: { ...defaultColors.character }, entries: [] };
   state.group = { selected: '', otherName: '', attitude: '', customAttitudes: [], colors: { ...defaultColors.group }, entries: [] };
   state.cp = { selected: [], attitude: '', customAttitudes: [], colors: { ...defaultColors.cp }, entries: [], nonDirectional: false, singleStatus: '', singleCustomStatuses: [], singleColors: { ...defaultColors.single }, tripleStatus: '', tripleCustomStatuses: [], tripleColors: { ...defaultColors.triple }, tripleAttitude: '', tripleCustomAttitudes: [], tripleAttitudeColors: { ...defaultColors.cp } };
@@ -476,17 +497,15 @@ function reset() {
   elements.avatarPreview.hidden = true; elements.avatarPreview.removeAttribute('src'); elements.avatarPlaceholder.hidden = false; renderAll();
 }
 
-function renderAll() { renderCharacterPicker(); renderAttitudePicker('character'); renderCharacterDraft(); renderEntryList(elements.characterEntryList, state.character.entries, 'character'); renderColorLegendEditor(); renderGroupPicker(); renderAttitudePicker('group'); renderGroupDraft(); renderEntryList(elements.groupEntryList, state.group.entries, 'group'); renderCpPicker(); renderCpMode(); renderAttitudePicker('cp'); renderCpDraft(); renderEntryList(elements.cpEntryList, state.cp.entries, 'cp'); renderNotesEditor(); renderPreview(); renderMobileView(); }
+function renderAll() { renderCharacterPicker(); renderAttitudePicker('character'); renderCharacterDraft(); renderEntryList(elements.characterEntryList, state.character.entries, 'character'); renderColorLegendEditor(); renderSavedColorButtons(); renderGroupPicker(); renderAttitudePicker('group'); renderGroupDraft(); renderEntryList(elements.groupEntryList, state.group.entries, 'group'); renderCpPicker(); renderCpMode(); renderAttitudePicker('cp'); renderCpDraft(); renderEntryList(elements.cpEntryList, state.cp.entries, 'cp'); renderNotesEditor(); renderPreview(); renderMobileView(); }
 
 elements.nameInput.addEventListener('input', (event) => { state.name = event.target.value; renderPreview(); }); elements.bioInput.addEventListener('input', (event) => { state.bio = event.target.value; renderPreview(); });
 elements.otherGroupInput.addEventListener('input', (event) => { state.group.otherName = event.target.value; renderGroupDraft(); });
 elements.avatarInput.addEventListener('change', (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.addEventListener('load', () => { state.avatar = reader.result; elements.avatarPreview.src = state.avatar; elements.avatarPreview.hidden = false; elements.avatarPlaceholder.hidden = true; renderPreview(); }); reader.readAsDataURL(file); });
-elements.characterColor.addEventListener('input', (event) => updateAttitudeColor('character', event.target.value)); elements.groupColor.addEventListener('input', (event) => updateAttitudeColor('group', event.target.value)); elements.cpColor.addEventListener('input', (event) => updateAttitudeColor('cp', event.target.value)); elements.cpTripleColor.addEventListener('input', (event) => updateTripleAttitudeColor(event.target.value));
+elements.characterColor.addEventListener('input', (event) => updateAttitudeColor('character', event.target.value, true)); elements.groupColor.addEventListener('input', (event) => updateAttitudeColor('group', event.target.value, true)); elements.cpColor.addEventListener('input', (event) => updateAttitudeColor('cp', event.target.value, true)); elements.cpTripleColor.addEventListener('input', (event) => updateTripleAttitudeColor(event.target.value, true));
 elements.quickColorButtons.forEach((button) => button.addEventListener('click', () => {
   const { color, colorTarget } = button.dataset;
-  if (colorTarget === 'cp-triple') { elements.cpTripleColor.value = color; updateTripleAttitudeColor(color); return; }
-  const colorInput = colorTarget === 'character' ? elements.characterColor : colorTarget === 'group' ? elements.groupColor : elements.cpColor;
-  colorInput.value = color; updateAttitudeColor(colorTarget, color);
+  applyQuickColor(colorTarget, color);
 }));
 elements.addCharacterAttitude.addEventListener('click', () => addCustomAttitude('character')); elements.addGroupAttitude.addEventListener('click', () => addCustomAttitude('group')); elements.addCpAttitude.addEventListener('click', () => addCustomAttitude('cp'));
 elements.addCpSingleCustom.addEventListener('click', addSingleCustomStatus);
