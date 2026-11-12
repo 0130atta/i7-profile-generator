@@ -510,6 +510,148 @@ function renderNotesEditor() {
 
 function addNote() { state.notes.push({ id: entryId(), title: '', text: '' }); renderNotesEditor(); renderPreview(); }
 
+function roundedRect(context, x, y, width, height, radius) {
+  const corner = Math.min(radius, width / 2, height / 2);
+  context.beginPath(); context.moveTo(x + corner, y); context.arcTo(x + width, y, x + width, y + height, corner); context.arcTo(x + width, y + height, x, y + height, corner); context.arcTo(x, y + height, x, y, corner); context.arcTo(x, y, x + width, y, corner); context.closePath();
+}
+
+function loadExportImage(source) {
+  return new Promise((resolve) => {
+    if (!source) { resolve(null); return; }
+    const image = new Image();
+    image.onload = () => {
+      const sourceWidth = image.naturalWidth || image.width; const sourceHeight = image.naturalHeight || image.height; const maxSide = 160;
+      if (!sourceWidth || !sourceHeight) { resolve(null); return; }
+      if (sourceWidth <= maxSide && sourceHeight <= maxSide) { resolve(image); return; }
+      const ratio = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight)); const resized = document.createElement('canvas'); resized.width = Math.max(1, Math.round(sourceWidth * ratio)); resized.height = Math.max(1, Math.round(sourceHeight * ratio));
+      const resizedContext = resized.getContext('2d'); resizedContext.drawImage(image, 0, 0, resized.width, resized.height); image.onload = null; image.onerror = null; image.src = ''; resolve(resized);
+    };
+    image.onerror = () => resolve(null); image.src = source;
+  });
+}
+
+function optimizeAvatarFile(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image(); const canUseObjectUrl = window.URL && typeof window.URL.createObjectURL === 'function'; let objectUrl = '';
+    const cleanup = () => { if (objectUrl) window.URL.revokeObjectURL(objectUrl); image.onload = null; image.onerror = null; };
+    image.onload = () => {
+      try {
+        const sourceWidth = image.naturalWidth || image.width; const sourceHeight = image.naturalHeight || image.height; const maxSide = 512; const ratio = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+        const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(sourceWidth * ratio)); canvas.height = Math.max(1, Math.round(sourceHeight * ratio));
+        const context = canvas.getContext('2d'); context.fillStyle = '#f3f6ff'; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85); cleanup(); resolve(dataUrl);
+      } catch (error) { cleanup(); reject(error); }
+    };
+    image.onerror = () => { cleanup(); reject(new Error('头像图片无法读取')); };
+    if (canUseObjectUrl) { objectUrl = window.URL.createObjectURL(file); image.src = objectUrl; return; }
+    const reader = new FileReader(); reader.onload = () => { image.src = reader.result; }; reader.onerror = () => reject(new Error('头像图片无法读取')); reader.readAsDataURL(file);
+  });
+}
+
+function canvasToDataUrl(canvas) {
+  return new Promise((resolve, reject) => {
+    if (typeof canvas.toBlob !== 'function' || typeof FileReader !== 'function') {
+      try { resolve(canvas.toDataURL('image/png')); } catch (error) { reject(error); }
+      return;
+    }
+    canvas.toBlob((blob) => {
+      if (!blob) { reject(new Error('无法生成 PNG')); return; }
+      const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('无法读取 PNG')); reader.readAsDataURL(blob);
+    }, 'image/png');
+  });
+}
+
+function truncateCanvasText(context, text, maxWidth) {
+  if (context.measureText(text).width <= maxWidth) return text;
+  let output = text;
+  while (output.length && context.measureText(`${output}…`).width > maxWidth) output = output.slice(0, -1);
+  return `${output}…`;
+}
+
+function wrapCanvasText(context, text, maxWidth) {
+  const lines = []; let line = '';
+  String(text || '').split('\n').forEach((paragraph) => {
+    for (let index = 0; index < paragraph.length; index += 1) {
+      const candidate = line + paragraph.charAt(index);
+      if (line && context.measureText(candidate).width > maxWidth) { lines.push(line); line = paragraph.charAt(index); } else line = candidate;
+    }
+    lines.push(line || ''); line = '';
+  });
+  return lines.length ? lines : [''];
+}
+
+function drawExportAvatar(context, image, x, y, size, borderColor, fallback) {
+  context.save(); context.fillStyle = '#f3f6ff'; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2); context.fill();
+  if (image) { context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 2, 0, Math.PI * 2); context.clip(); context.drawImage(image, x + 2, y + 2, size - 4, size - 4); }
+  context.restore(); context.strokeStyle = borderColor || '#5477ce'; context.lineWidth = 2; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 1, 0, Math.PI * 2); context.stroke();
+  if (!image) { context.fillStyle = borderColor || '#5477ce'; context.font = '700 15px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(fallback || 'i7', x + size / 2, y + size / 2); }
+}
+
+function drawExportTag(context, label, color, x, y, maxWidth) {
+  context.font = '700 15px sans-serif'; const text = truncateCanvasText(context, label, maxWidth - 22); const width = Math.min(maxWidth, context.measureText(text).width + 22);
+  roundedRect(context, x, y, width, 28, 14); context.fillStyle = '#f5f8ff'; context.fill(); context.strokeStyle = color; context.lineWidth = 1; context.stroke(); context.fillStyle = color; context.textBaseline = 'middle'; context.fillText(text, x + 11, y + 14);
+}
+
+async function createProfileExportCanvas() {
+  const measureCanvas = document.createElement('canvas'); const measure = measureCanvas.getContext('2d'); const width = 900; const padding = 42; const bodyWidth = width - padding * 2;
+  const sections = [];
+  if (state.visibility.legend && state.colorLegend.length) sections.push({ type: 'legend', title: '态度颜色说明', kicker: 'LEGEND', items: state.colorLegend });
+  if (state.visibility.character) sections.push({ type: 'character', title: '角色喜好', kicker: 'CHARACTER', items: state.character.entries });
+  if (state.visibility.group) sections.push({ type: 'group', title: '团体喜好', kicker: 'GROUP', items: state.group.entries });
+  if (state.visibility.cp) sections.push({ type: 'cp', title: '角色 / CP 词条', kicker: 'PAIRING', items: state.cp.entries });
+  if (state.visibility.notes && state.notes.length) sections.push({ type: 'notes', title: '备注', kicker: 'NOTES', items: state.notes });
+  let height = state.visibility.personal ? 186 : 50;
+  measure.font = '500 14px sans-serif';
+  sections.forEach((section) => {
+    height += 44;
+    if (section.type === 'legend') height += section.items.length * 32;
+    else if (section.type === 'notes') section.items.forEach((item) => { height += 38 + wrapCanvasText(measure, item.text || '未填写内容', bodyWidth - 26).length * 20; });
+    else height += Math.max(1, section.items.length) * 56;
+    height += 10;
+  });
+  height += 70;
+  const maxPixels = 4000000; const maxDimension = 4096;
+  const scale = Math.min(2, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
+  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.floor(width * scale)); canvas.height = Math.max(1, Math.floor(height * scale));
+  const context = canvas.getContext('2d'); context.scale(scale, scale); context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height); context.fillStyle = '#5477ce'; context.fillRect(0, 0, width, 9);
+  const imageSources = [];
+  if (state.avatar) imageSources.push(state.avatar);
+  state.character.entries.concat(state.cp.entries).forEach((entry) => entry.characters.forEach((id) => { const character = characterById(id); if (character) imageSources.push(character.image); }));
+  state.group.entries.forEach((entry) => entry.characters.forEach((id) => { const group = groupById(id); if (group && group.image) imageSources.push(group.image); }));
+  const uniqueImageSources = Array.from(new Set(imageSources)); const images = new Map();
+  for (let imageIndex = 0; imageIndex < uniqueImageSources.length; imageIndex += 1) images.set(uniqueImageSources[imageIndex], await loadExportImage(uniqueImageSources[imageIndex]));
+  let y = 30;
+  if (state.visibility.personal) {
+    drawExportAvatar(context, images.get(state.avatar), padding, y, 92, '#5477ce', 'i7'); context.fillStyle = '#5477ce'; context.font = '700 13px sans-serif'; context.fillText('FAN PROFILE', padding + 118, y + 22);
+    context.fillStyle = '#263452'; context.font = '700 30px sans-serif'; context.fillText(truncateCanvasText(context, state.name.trim() || '你的昵称', bodyWidth - 125), padding + 118, y + 64);
+    context.fillStyle = '#71809a'; context.font = '500 15px sans-serif'; const bioLines = wrapCanvasText(context, state.bio.trim() || '在编辑区填写信息，生成属于你的属性卡。', bodyWidth - 125); bioLines.slice(0, 2).forEach((line, index) => context.fillText(line, padding + 118, y + 91 + index * 21)); y += 132;
+  }
+  sections.forEach((section) => {
+    context.strokeStyle = '#e4eaf5'; context.lineWidth = 1; context.beginPath(); context.moveTo(padding, y); context.lineTo(width - padding, y); context.stroke(); y += 28;
+    context.fillStyle = '#5477ce'; context.font = '700 12px sans-serif'; context.fillText(section.kicker, padding, y); context.fillStyle = '#263452'; context.font = '700 18px sans-serif'; context.fillText(section.title, padding + 88, y); y += 18;
+    if (section.type === 'legend') {
+      section.items.forEach((item) => { context.fillStyle = item.color; context.beginPath(); context.arc(padding + 7, y + 10, 7, 0, Math.PI * 2); context.fill(); context.fillStyle = '#71809a'; context.font = '500 14px sans-serif'; context.fillText(truncateCanvasText(context, item.note.trim() || '未填写说明', bodyWidth - 30), padding + 25, y + 15); y += 32; });
+    } else if (section.type === 'notes') {
+      section.items.forEach((item) => { roundedRect(context, padding, y, bodyWidth, 30 + wrapCanvasText(measure, item.text || '未填写内容', bodyWidth - 26).length * 20, 8); context.fillStyle = '#f5f8ff'; context.fill(); context.strokeStyle = '#e4eaf5'; context.stroke(); context.fillStyle = '#263452'; context.font = '700 14px sans-serif'; context.fillText(truncateCanvasText(context, item.title.trim() || '备注', bodyWidth - 22), padding + 13, y + 20); context.fillStyle = '#71809a'; context.font = '500 14px sans-serif'; const lines = wrapCanvasText(context, item.text.trim() || '未填写内容', bodyWidth - 26); lines.forEach((line, index) => context.fillText(line, padding + 13, y + 43 + index * 20)); y += 38 + lines.length * 20; });
+    } else if (!section.items.length) {
+      context.fillStyle = '#71809a'; context.font = '500 14px sans-serif'; context.fillText('尚未生成词条', padding, y + 18); y += 56;
+    } else {
+      section.items.forEach((entry) => {
+        let x = padding; const color = entry.color || '#5477ce';
+        entry.characters.forEach((id, index) => {
+          if (section.type === 'group') {
+            const group = groupById(id); roundedRect(context, x, y, 78, 34, 7); context.fillStyle = '#f8faff'; context.fill(); context.strokeStyle = color; context.stroke(); const groupImage = group && images.get(group.image); if (groupImage) context.drawImage(groupImage, x + 6, y + 5, 66, 24); else { context.fillStyle = color; context.font = '700 11px sans-serif'; context.fillText(truncateCanvasText(context, (entry.groupNames && entry.groupNames[id]) || (group && group.label) || '团体', 60), x + 8, y + 21); } x += 86;
+          } else { const character = characterById(id); drawExportAvatar(context, character && images.get(character.image), x, y, 38, entry.characters.length === 1 ? '#ffffff' : color, 'i7'); x += 45; if (entry.characters.length === 2 && index === 0) { context.fillStyle = '#71809a'; context.font = '700 16px sans-serif'; context.fillText(entry.nonDirectional ? '×' : '→', x, y + 24); x += 24; } }
+        });
+        drawExportTag(context, entry.attitude, color, Math.min(x + 8, width - padding - 160), y + 4, width - padding - Math.min(x + 8, width - padding - 160)); y += 56;
+      });
+    }
+    y += 10;
+  });
+  context.strokeStyle = '#e4eaf5'; context.beginPath(); context.moveTo(padding, height - 52); context.lineTo(width - padding, height - 52); context.stroke(); context.fillStyle = '#71809a'; context.font = '700 11px sans-serif'; context.fillText('i7 PROFILE', padding, height - 27); context.textAlign = 'right'; context.fillText('made by atta', width - padding, height - 27); context.textAlign = 'left';
+  return { canvas: canvas, scale: scale, height: height };
+}
+
 let pendingJpegExport = null;
 let pendingJpegObjectUrl = '';
 
@@ -556,18 +698,14 @@ async function savePendingJpegExport() {
 
 async function exportPng() {
   if (pendingJpegExport) { openExportImagePreview(); return; }
-  if (typeof window.html2canvas !== 'function') { elements.exportStatus.textContent = '\u5bfc\u51fa\u7ec4\u4ef6\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5'; return; }
-  elements.exportPng.disabled = true; elements.exportStatus.textContent = '\u6b63\u5728\u751f\u6210 JPG\u2026';
+  elements.exportPng.disabled = true; elements.exportStatus.textContent = '\u6b63\u5728\u7ed8\u5236 JPG\u2026';
   try {
-    if (document.fonts && document.fonts.ready) await document.fonts.ready;
-    const width = Math.max(elements.card.scrollWidth, elements.card.offsetWidth, 1); const height = Math.max(elements.card.scrollHeight, elements.card.offsetHeight, 1);
-    const maxPixels = 4000000; const maxDimension = 4096; const scale = Math.min(2, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
-    const canvas = await window.html2canvas(elements.card, { backgroundColor: '#ffffff', scale: scale, useCORS: true, logging: false }); const blob = await canvasToExportBlob(canvas);
+    const result = await createProfileExportCanvas(); const blob = await canvasToExportBlob(result.canvas);
     const name = (state.name.trim() || 'i7-profile').replace(/[\\/:*?"<>|]/g, '_'); pendingJpegExport = { blob: blob, name: `${name}-profile.jpg` };
-    elements.exportPng.textContent = '\u67e5\u770b JPG'; elements.exportStatus.textContent = scale < 2 ? '\u6761\u76ee\u8f83\u591a\uff0c\u5df2\u4f18\u5316 JPG\uff1b\u8bf7\u957f\u6309\u5927\u56fe\u4fdd\u5b58' : 'JPG \u5df2\u751f\u6210\uff0c\u8bf7\u957f\u6309\u5927\u56fe\u4fdd\u5b58';
+    elements.exportPng.textContent = '\u67e5\u770b JPG'; elements.exportStatus.textContent = result.scale < 2 ? '\u6761\u76ee\u8f83\u591a\uff0c\u5df2\u4f18\u5316 JPG\uff1b\u8bf7\u957f\u6309\u5927\u56fe\u4fdd\u5b58' : 'JPG \u5df2\u751f\u6210\uff0c\u8bf7\u957f\u6309\u5927\u56fe\u4fdd\u5b58';
     if (!openExportImagePreview()) elements.exportStatus.textContent = '\u751f\u6210\u6210\u529f\uff0c\u4f46\u65e0\u6cd5\u6253\u5f00\u56fe\u7247\u9884\u89c8\uff1b\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5';
   } catch (error) {
-    console.error(error); elements.exportStatus.textContent = '\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5';
+    console.error(error); elements.exportStatus.textContent = '\u7ed8\u5236\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5';
   } finally { elements.exportPng.disabled = false; }
 }
 
