@@ -178,6 +178,11 @@ input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px
 .theme-green { --card-bg:#fbfffc; --card-ink:#27493f; --card-muted:#719286; --card-accent:#429276; --card-line:#dceee6; --avatar-bg:#effaf5; --tag-bg:#eff9f4; --tag-border:#d0eadf; }
 .theme-violet { --card-bg:#fefcff; --card-ink:#413154; --card-muted:#8c7a9c; --card-accent:#8563bb; --card-line:#ebe3f3; --avatar-bg:#f6f1fc; --tag-bg:#f7f3fc; --tag-border:#e5d9f3; }
 .preview-tip { margin: 11px 4px 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.export-actions { display: flex; align-items: center; gap: 9px; margin: 12px 4px 0; }
+.export-button { min-height: 36px; padding: 0 14px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
+.export-button:hover { filter: brightness(.94); }
+.export-button:disabled { cursor: wait; opacity: .65; }
+.export-status { color: var(--muted); font-size: 11px; }
 .mobile-view-switcher { display: none; }
 
 @media (max-width: 920px) {
