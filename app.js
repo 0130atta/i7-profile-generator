@@ -580,6 +580,13 @@ function wrapCanvasText(context, text, maxWidth) {
   return lines.length ? lines : [''];
 }
 
+const exportCanvasFontFallback = '"YouYuan", "\u5e7c\u5706", "PingFang SC", "Hiragino Sans GB", "MiSans", "HarmonyOS Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif';
+
+function exportCanvasFont(weight, size) {
+  const rootFontFamily = window.getComputedStyle && document.documentElement ? window.getComputedStyle(document.documentElement).fontFamily : '';
+  return `${weight} ${size}px ${rootFontFamily || exportCanvasFontFallback}`;
+}
+
 function drawExportContainedImage(context, image, x, y, width, height) {
   const imageWidth = image && (image.width || image.naturalWidth); const imageHeight = image && (image.height || image.naturalHeight);
   if (!imageWidth || !imageHeight) return;
@@ -591,25 +598,25 @@ function drawExportAvatar(context, image, x, y, size, borderColor, fallback) {
   context.save(); context.fillStyle = '#f3f6ff'; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2); context.fill();
   if (image) { context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 2, 0, Math.PI * 2); context.clip(); drawExportContainedImage(context, image, x + 2, y + 2, size - 4, size - 4); }
   context.restore(); context.strokeStyle = borderColor || '#5477ce'; context.lineWidth = 2; context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2 - 1, 0, Math.PI * 2); context.stroke();
-  if (!image) { context.fillStyle = borderColor || '#5477ce'; context.font = '700 15px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(fallback || 'i7', x + size / 2, y + size / 2); context.textAlign = 'left'; context.textBaseline = 'alphabetic'; }
+  if (!image) { context.fillStyle = borderColor || '#5477ce'; context.font = exportCanvasFont('700', 15); context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(fallback || 'i7', x + size / 2, y + size / 2); context.textAlign = 'left'; context.textBaseline = 'alphabetic'; }
 }
 
 function drawExportSideBadge(context, side, color, x, y) {
-  context.fillStyle = color; context.beginPath(); context.arc(x, y, 10, 0, Math.PI * 2); context.fill(); context.fillStyle = '#fff'; context.font = '700 11px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(side, x, y + 1); context.textAlign = 'left'; context.textBaseline = 'alphabetic';
+  context.fillStyle = color; context.beginPath(); context.arc(x, y, 10, 0, Math.PI * 2); context.fill(); context.fillStyle = '#fff'; context.font = exportCanvasFont('700', 11); context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(side, x, y + 1); context.textAlign = 'left'; context.textBaseline = 'alphabetic';
 }
 
 function exportTagMetrics(context, label, maxWidth) {
-  context.font = '700 20px sans-serif'; const text = truncateCanvasText(context, label || '', Math.max(30, maxWidth - 30)); return { text: text, width: Math.min(maxWidth, context.measureText(text).width + 30), height: 44 };
+  context.font = exportCanvasFont('700', 20); const text = truncateCanvasText(context, label || '', Math.max(30, maxWidth - 30)); return { text: text, width: Math.min(maxWidth, context.measureText(text).width + 30), height: 44 };
 }
 
 function drawExportTag(context, metrics, color, x, y) {
-  roundedRect(context, x, y, metrics.width, metrics.height, metrics.height / 2); context.fillStyle = '#f8faff'; context.fill(); context.strokeStyle = color; context.lineWidth = 2; context.stroke(); context.fillStyle = color; context.font = '700 20px sans-serif'; context.textBaseline = 'middle'; context.fillText(metrics.text, x + 15, y + metrics.height / 2); context.textBaseline = 'alphabetic';
+  roundedRect(context, x, y, metrics.width, metrics.height, metrics.height / 2); context.fillStyle = '#f8faff'; context.fill(); context.strokeStyle = color; context.lineWidth = 2; context.stroke(); context.fillStyle = color; context.font = exportCanvasFont('700', 20); context.textBaseline = 'middle'; context.fillText(metrics.text, x + 15, y + metrics.height / 2); context.textBaseline = 'alphabetic';
 }
 
 function drawExportGroupLogo(context, image, label, color, x, y) {
   roundedRect(context, x, y, 116, 52, 10); context.fillStyle = '#f8faff'; context.fill(); context.strokeStyle = color; context.lineWidth = 2; context.stroke();
   if (image) drawExportContainedImage(context, image, x + 8, y + 7, 100, 38);
-  else { context.fillStyle = color; context.font = '700 16px sans-serif'; context.textBaseline = 'middle'; context.fillText(truncateCanvasText(context, label || '\u56e2\u4f53', 94), x + 11, y + 27); context.textBaseline = 'alphabetic'; }
+  else { context.fillStyle = color; context.font = exportCanvasFont('700', 16); context.textBaseline = 'middle'; context.fillText(truncateCanvasText(context, label || '\u56e2\u4f53', 94), x + 11, y + 27); context.textBaseline = 'alphabetic'; }
 }
 
 function mergeExportEntries(items) {
@@ -642,10 +649,10 @@ function layoutExportEntries(context, section, images, startY, width, padding, d
     if (section.type === 'group') {
       const group = groupById(entry.characters[0]); const label = (entry.groupNames && entry.groupNames[entry.characters[0]]) || (group && group.label) || '\u56e2\u4f53'; place(122, 52, (cellX, cellY) => drawExportGroupLogo(context, group && images && images.get(group.image), label, entry.color, cellX, cellY)); return;
     }
-    entry.characters.forEach((characterId, index) => { placeAvatar(entry, characterId, index); if (section.type === 'cp' && entry.characters.length === 2 && index === 0) place(20, 54, (cellX, cellY) => { context.fillStyle = '#71809a'; context.font = '700 20px sans-serif'; context.textBaseline = 'middle'; context.fillText(entry.nonDirectional ? '\u00d7' : '\u2192', cellX, cellY + 27); context.textBaseline = 'alphabetic'; }); });
+    entry.characters.forEach((characterId, index) => { placeAvatar(entry, characterId, index); if (section.type === 'cp' && entry.characters.length === 2 && index === 0) place(20, 54, (cellX, cellY) => { context.fillStyle = '#71809a'; context.font = exportCanvasFont('700', 20); context.textBaseline = 'middle'; context.fillText(entry.nonDirectional ? '\u00d7' : '\u2192', cellX, cellY + 27); context.textBaseline = 'alphabetic'; }); });
   };
   const blocks = getExportEntryBlocks(section);
-  if (!blocks.length || !section.items.length) { if (draw) { context.fillStyle = '#71809a'; context.font = '500 22px sans-serif'; context.fillText('\u5c1a\u672a\u751f\u6210\u8bcd\u6761', padding, y + 26); } return y + 48; }
+  if (!blocks.length || !section.items.length) { if (draw) { context.fillStyle = '#71809a'; context.font = exportCanvasFont('500', 22); context.fillText('\u5c1a\u672a\u751f\u6210\u8bcd\u6761', padding, y + 26); } return y + 48; }
   blocks.forEach((block) => {
     if (block.separated) { finishRow(); if (draw) { context.setLineDash([6, 6]); context.strokeStyle = '#e4eaf5'; context.beginPath(); context.moveTo(padding, y + 8); context.lineTo(right, y + 8); context.stroke(); context.setLineDash([]); } y += 24; }
     block.groups.forEach((group) => {
@@ -667,7 +674,7 @@ async function createProfileExportCanvas() {
   sections.forEach((section) => {
     height += 52;
     if (section.type === 'legend') height += section.items.length * 42;
-    else if (section.type === 'notes') section.items.forEach((item) => { measure.font = '500 20px sans-serif'; height += 48 + wrapCanvasText(measure, item.text || '\u672a\u586b\u5199\u5185\u5bb9', bodyWidth - 32).length * 27; });
+    else if (section.type === 'notes') section.items.forEach((item) => { measure.font = exportCanvasFont('500', 20); height += 48 + wrapCanvasText(measure, item.text || '\u672a\u586b\u5199\u5185\u5bb9', bodyWidth - 32).length * 27; });
     else height = layoutExportEntries(measure, section, null, height, width, padding, false);
     height += 18;
   });
@@ -681,20 +688,20 @@ async function createProfileExportCanvas() {
   const images = new Map(); const uniqueImageSources = Array.from(new Set(imageSources)); for (let index = 0; index < uniqueImageSources.length; index += 1) images.set(uniqueImageSources[index], await loadExportImage(uniqueImageSources[index]));
   let y = 36;
   if (state.visibility.personal) {
-    drawExportAvatar(context, images.get(state.avatar), padding, y, 140, '#5477ce', 'i7'); context.fillStyle = '#5477ce'; context.font = '700 16px sans-serif'; context.fillText('FAN PROFILE', padding + 170, y + 25);
-    context.fillStyle = '#263452'; context.font = '700 36px sans-serif'; context.fillText(truncateCanvasText(context, state.name.trim() || '\u4f60\u7684\u6635\u79f0', bodyWidth - 180), padding + 170, y + 76);
-    context.fillStyle = '#71809a'; context.font = '500 20px sans-serif'; const bioLines = wrapCanvasText(context, state.bio.trim() || '\u5728\u7f16\u8f91\u533a\u586b\u5199\u4fe1\u606f\uff0c\u751f\u6210\u5c5e\u4e8e\u4f60\u7684\u5c5e\u6027\u5361\u3002', bodyWidth - 180); bioLines.slice(0, 2).forEach((line, index) => context.fillText(line, padding + 170, y + 108 + index * 28)); y = 246;
+    drawExportAvatar(context, images.get(state.avatar), padding, y, 140, '#5477ce', 'i7'); context.fillStyle = '#5477ce'; context.font = exportCanvasFont('700', 16); context.fillText('FAN PROFILE', padding + 170, y + 25);
+    context.fillStyle = '#263452'; context.font = exportCanvasFont('700', 36); context.fillText(truncateCanvasText(context, state.name.trim() || '\u4f60\u7684\u6635\u79f0', bodyWidth - 180), padding + 170, y + 76);
+    context.fillStyle = '#71809a'; context.font = exportCanvasFont('500', 20); const bioLines = wrapCanvasText(context, state.bio.trim() || '\u5728\u7f16\u8f91\u533a\u586b\u5199\u4fe1\u606f\uff0c\u751f\u6210\u5c5e\u4e8e\u4f60\u7684\u5c5e\u6027\u5361\u3002', bodyWidth - 180); bioLines.slice(0, 2).forEach((line, index) => context.fillText(line, padding + 170, y + 108 + index * 28)); y = 246;
   }
   sections.forEach((section) => {
-    context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.beginPath(); context.moveTo(padding, y); context.lineTo(width - padding, y); context.stroke(); context.fillStyle = '#5477ce'; context.font = '700 14px sans-serif'; context.fillText(section.kicker, padding, y + 30); context.fillStyle = '#263452'; context.font = '700 24px sans-serif'; context.fillText(section.title, padding + 116, y + 30); y += 52;
+    context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.beginPath(); context.moveTo(padding, y); context.lineTo(width - padding, y); context.stroke(); context.fillStyle = '#5477ce'; context.font = exportCanvasFont('700', 14); context.fillText(section.kicker, padding, y + 30); context.fillStyle = '#263452'; context.font = exportCanvasFont('700', 24); context.fillText(section.title, padding + 116, y + 30); y += 52;
     if (section.type === 'legend') {
-      section.items.forEach((item) => { context.fillStyle = item.color; context.beginPath(); context.arc(padding + 9, y + 16, 9, 0, Math.PI * 2); context.fill(); context.fillStyle = '#71809a'; context.font = '500 20px sans-serif'; context.fillText(truncateCanvasText(context, item.note.trim() || '\u672a\u586b\u5199\u8bf4\u660e', bodyWidth - 38), padding + 32, y + 23); y += 42; });
+      section.items.forEach((item) => { context.fillStyle = item.color; context.beginPath(); context.arc(padding + 9, y + 16, 9, 0, Math.PI * 2); context.fill(); context.fillStyle = '#71809a'; context.font = exportCanvasFont('500', 20); context.fillText(truncateCanvasText(context, item.note.trim() || '\u672a\u586b\u5199\u8bf4\u660e', bodyWidth - 38), padding + 32, y + 23); y += 42; });
     } else if (section.type === 'notes') {
-      section.items.forEach((item) => { context.font = '500 20px sans-serif'; const lines = wrapCanvasText(context, item.text.trim() || '\u672a\u586b\u5199\u5185\u5bb9', bodyWidth - 32); const boxHeight = 48 + lines.length * 27; roundedRect(context, padding, y, bodyWidth, boxHeight, 12); context.fillStyle = '#f5f8ff'; context.fill(); context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.stroke(); context.fillStyle = '#263452'; context.font = '700 20px sans-serif'; context.fillText(truncateCanvasText(context, item.title.trim() || '\u5907\u6ce8', bodyWidth - 28), padding + 16, y + 28); context.fillStyle = '#71809a'; context.font = '500 20px sans-serif'; lines.forEach((line, index) => context.fillText(line, padding + 16, y + 57 + index * 27)); y += boxHeight; });
+      section.items.forEach((item) => { context.font = exportCanvasFont('500', 20); const lines = wrapCanvasText(context, item.text.trim() || '\u672a\u586b\u5199\u5185\u5bb9', bodyWidth - 32); const boxHeight = 48 + lines.length * 27; roundedRect(context, padding, y, bodyWidth, boxHeight, 12); context.fillStyle = '#f5f8ff'; context.fill(); context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.stroke(); context.fillStyle = '#263452'; context.font = exportCanvasFont('700', 20); context.fillText(truncateCanvasText(context, item.title.trim() || '\u5907\u6ce8', bodyWidth - 28), padding + 16, y + 28); context.fillStyle = '#71809a'; context.font = exportCanvasFont('500', 20); lines.forEach((line, index) => context.fillText(line, padding + 16, y + 57 + index * 27)); y += boxHeight; });
     } else y = layoutExportEntries(context, section, images, y, width, padding, true);
     y += 18;
   });
-  context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.beginPath(); context.moveTo(padding, height - 52); context.lineTo(width - padding, height - 52); context.stroke(); context.fillStyle = '#71809a'; context.font = '700 14px sans-serif'; context.fillText('i7 PROFILE', padding, height - 24); context.textAlign = 'right'; context.fillText('made by atta', width - padding, height - 24); context.textAlign = 'left';
+  context.strokeStyle = '#e4eaf5'; context.lineWidth = 2; context.beginPath(); context.moveTo(padding, height - 52); context.lineTo(width - padding, height - 52); context.stroke(); context.fillStyle = '#71809a'; context.font = exportCanvasFont('700', 14); context.fillText('i7 PROFILE', padding, height - 24); context.textAlign = 'right'; context.fillText('made by atta', width - padding, height - 24); context.textAlign = 'left';
   return { canvas: canvas, scale: scale, height: height };
 }
 
