@@ -41,6 +41,8 @@ const state = {
   cp: { selected: [], attitude: '', customAttitudes: [], colors: { ...defaultColors.cp }, entries: [], nonDirectional: false, singleStatus: '', singleCustomStatuses: [], singleColors: { ...defaultColors.single }, tripleStatus: '', tripleCustomStatuses: [], tripleColors: { ...defaultColors.triple }, tripleAttitude: '', tripleCustomAttitudes: [], tripleAttitudeColors: { ...defaultColors.cp } }
 };
 
+const storageKey = 'i7-profile-generator-state-v1';
+
 const elements = {
   character: document.querySelector('#characterChips'), characterAttitudes: document.querySelector('#characterAttitudeChips'),
   characterColor: document.querySelector('#characterColorInput'), characterCustomInput: document.querySelector('#characterAttitudeCustomInput'),
@@ -68,6 +70,26 @@ function groupById(id) { return groups.find((group) => group.id === id); }
 function createPortrait(character) { const image = document.createElement('img'); image.src = character.image; image.alt = character.label; return image; }
 function createGroupLogo(group, label = group.label) { if (group.image) { const image = document.createElement('img'); image.src = group.image; image.alt = label; return image; } const text = document.createElement('span'); text.className = 'group-logo-text'; text.textContent = label; return text; }
 function entryId() { return `${Date.now()}-${Math.random()}`; }
+
+function persistState() {
+  try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch (error) { console.warn('无法保存本地资料', error); }
+}
+
+function restoreState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey)); if (!saved || typeof saved !== 'object') return;
+    state.name = typeof saved.name === 'string' ? saved.name : ''; state.bio = typeof saved.bio === 'string' ? saved.bio : ''; state.avatar = typeof saved.avatar === 'string' ? saved.avatar : '';
+    state.mobileView = saved.mobileView === 'preview' ? 'preview' : 'editor'; state.visibility = { ...state.visibility, ...(saved.visibility || {}) };
+    state.colorLegend = Array.isArray(saved.colorLegend) ? saved.colorLegend : []; state.savedColors = Array.isArray(saved.savedColors) ? saved.savedColors : []; state.notes = Array.isArray(saved.notes) ? saved.notes : [];
+    state.character = { ...state.character, ...(saved.character || {}) }; state.group = { ...state.group, ...(saved.group || {}) }; state.cp = { ...state.cp, ...(saved.cp || {}) };
+  } catch (error) { console.warn('无法读取本地资料', error); }
+}
+
+function renderPersonalFields() {
+  elements.nameInput.value = state.name; elements.bioInput.value = state.bio;
+  if (state.avatar) { elements.avatarPreview.src = state.avatar; elements.avatarPreview.hidden = false; elements.avatarPlaceholder.hidden = true; }
+  else { elements.avatarPreview.hidden = true; elements.avatarPreview.removeAttribute('src'); elements.avatarPlaceholder.hidden = false; }
+}
 
 function renderPortraitPicker(container, selectedIds, onToggle, roleMode = false) {
   container.replaceChildren();
@@ -494,10 +516,11 @@ function reset() {
   state.group = { selected: '', otherName: '', attitude: '', customAttitudes: [], colors: { ...defaultColors.group }, entries: [] };
   state.cp = { selected: [], attitude: '', customAttitudes: [], colors: { ...defaultColors.cp }, entries: [], nonDirectional: false, singleStatus: '', singleCustomStatuses: [], singleColors: { ...defaultColors.single }, tripleStatus: '', tripleCustomStatuses: [], tripleColors: { ...defaultColors.triple }, tripleAttitude: '', tripleCustomAttitudes: [], tripleAttitudeColors: { ...defaultColors.cp } };
   elements.nameInput.value = ''; elements.bioInput.value = ''; elements.avatarInput.value = ''; elements.characterCustomInput.value = ''; elements.groupCustomInput.value = ''; elements.cpCustomInput.value = ''; elements.cpSingleCustomInput.value = ''; elements.cpTripleCustomInput.value = ''; elements.cpTripleAttitudeCustomInput.value = '';
+  try { localStorage.removeItem(storageKey); } catch (error) { console.warn('无法清空本地资料', error); }
   elements.avatarPreview.hidden = true; elements.avatarPreview.removeAttribute('src'); elements.avatarPlaceholder.hidden = false; renderAll();
 }
 
-function renderAll() { renderCharacterPicker(); renderAttitudePicker('character'); renderCharacterDraft(); renderEntryList(elements.characterEntryList, state.character.entries, 'character'); renderColorLegendEditor(); renderSavedColorButtons(); renderGroupPicker(); renderAttitudePicker('group'); renderGroupDraft(); renderEntryList(elements.groupEntryList, state.group.entries, 'group'); renderCpPicker(); renderCpMode(); renderAttitudePicker('cp'); renderCpDraft(); renderEntryList(elements.cpEntryList, state.cp.entries, 'cp'); renderNotesEditor(); renderPreview(); renderMobileView(); }
+function renderAll() { renderPersonalFields(); renderCharacterPicker(); renderAttitudePicker('character'); renderCharacterDraft(); renderEntryList(elements.characterEntryList, state.character.entries, 'character'); renderColorLegendEditor(); renderSavedColorButtons(); renderGroupPicker(); renderAttitudePicker('group'); renderGroupDraft(); renderEntryList(elements.groupEntryList, state.group.entries, 'group'); renderCpPicker(); renderCpMode(); renderAttitudePicker('cp'); renderCpDraft(); renderEntryList(elements.cpEntryList, state.cp.entries, 'cp'); renderNotesEditor(); renderPreview(); renderMobileView(); }
 
 elements.nameInput.addEventListener('input', (event) => { state.name = event.target.value; renderPreview(); }); elements.bioInput.addEventListener('input', (event) => { state.bio = event.target.value; renderPreview(); });
 elements.otherGroupInput.addEventListener('input', (event) => { state.group.otherName = event.target.value; renderGroupDraft(); });
@@ -525,4 +548,10 @@ elements.exportPng.addEventListener('click', exportPng);
 elements.confirmDisclaimer.addEventListener('click', () => { elements.disclaimerDialog.hidden = true; document.body.classList.remove('disclaimer-open'); });
 document.querySelector('#resetButton').addEventListener('click', reset);
 
+document.addEventListener('input', persistState);
+document.addEventListener('change', persistState);
+document.addEventListener('click', () => queueMicrotask(persistState));
+document.addEventListener('drop', () => queueMicrotask(persistState));
+
+restoreState();
 renderAll();
