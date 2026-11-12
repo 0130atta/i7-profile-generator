@@ -62,7 +62,7 @@ const elements = {
   visibilityButtons: document.querySelectorAll('[data-preview-module]'), notesEditor: document.querySelector('#notesEditor'), addNote: document.querySelector('#addNoteButton'),
   profileHeader: document.querySelector('#profileHeader'), profileHeaderDivider: document.querySelector('#profileHeaderDivider'), previewLegendSection: document.querySelector('#previewLegendSection'), previewColorLegend: document.querySelector('#previewColorLegend'), previewCharacterSection: document.querySelector('#previewCharacterSection'), previewGroupSection: document.querySelector('#previewGroupSection'), previewCpSection: document.querySelector('#previewCpSection'), previewNotesSection: document.querySelector('#previewNotesSection'), previewNotes: document.querySelector('#previewNotes'),
   exportPng: document.querySelector('#exportPngButton'), exportStatus: document.querySelector('#exportStatus'),
-  disclaimerDialog: document.querySelector('#disclaimerDialog'), confirmDisclaimer: document.querySelector('#confirmDisclaimerButton')
+  disclaimerDialog: document.querySelector('#disclaimerDialog'), confirmDisclaimer: document.querySelector('#confirmDisclaimerButton'), exportImageDialog: document.querySelector('#exportImageDialog'), exportImagePreview: document.querySelector('#exportImagePreview'), saveExportImage: document.querySelector('#saveExportImageButton'), closeExportImage: document.querySelector('#closeExportImageButton')
 };
 
 function characterById(id) { return characters.find((character) => character.id === id); }
@@ -511,6 +511,7 @@ function renderNotesEditor() {
 function addNote() { state.notes.push({ id: entryId(), title: '', text: '' }); renderNotesEditor(); renderPreview(); }
 
 let pendingJpegExport = null;
+let pendingJpegObjectUrl = '';
 
 function canvasToExportBlob(canvas) {
   return new Promise((resolve, reject) => {
@@ -526,29 +527,35 @@ function canvasToExportBlob(canvas) {
   });
 }
 
-function triggerJpegDownload(pending) {
-  const url = URL.createObjectURL(pending.blob); const link = document.createElement('a'); link.href = url; link.download = pending.name; document.body.append(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+function closeExportImagePreview() {
+  if (elements.exportImageDialog) elements.exportImageDialog.hidden = true;
+  if (elements.exportImagePreview) elements.exportImagePreview.removeAttribute('src');
+  if (pendingJpegObjectUrl) { URL.revokeObjectURL(pendingJpegObjectUrl); pendingJpegObjectUrl = ''; }
+  pendingJpegExport = null; elements.exportPng.textContent = '\u5bfc\u51fa JPG'; document.body.classList.remove('disclaimer-open');
+}
+
+function openExportImagePreview() {
+  if (!pendingJpegExport || !elements.exportImageDialog || !elements.exportImagePreview || !window.URL || typeof URL.createObjectURL !== 'function') return false;
+  if (pendingJpegObjectUrl) URL.revokeObjectURL(pendingJpegObjectUrl);
+  pendingJpegObjectUrl = URL.createObjectURL(pendingJpegExport.blob); elements.exportImagePreview.src = pendingJpegObjectUrl; elements.exportImageDialog.hidden = false; document.body.classList.add('disclaimer-open');
+  return true;
 }
 
 async function savePendingJpegExport() {
   const pending = pendingJpegExport; if (!pending) return;
   const file = typeof File === 'function' ? new File([pending.blob], pending.name, { type: 'image/jpeg' }) : null;
   const canShareFiles = !!file && typeof navigator.share === 'function' && (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] }));
-  if (canShareFiles) {
-    try {
-      await navigator.share({ files: [file], title: 'i7 PROFILE' });
-      pendingJpegExport = null; elements.exportPng.textContent = '\u5bfc\u51fa JPG'; elements.exportStatus.textContent = '\u5df2\u6253\u5f00\u4fdd\u5b58\u6216\u5206\u4eab\u9762\u677f';
-      return;
-    } catch (error) {
-      if (error && error.name === 'AbortError') { elements.exportStatus.textContent = '\u5df2\u53d6\u6d88\u4fdd\u5b58\uff0c\u53ef\u518d\u6b21\u70b9\u51fb\u201c\u4fdd\u5b58 JPG\u201d'; return; }
-    }
+  if (!canShareFiles) { elements.exportStatus.textContent = '\u5f53\u524d\u6d4f\u89c8\u5668\u4e0d\u652f\u6301\u7cfb\u7edf\u4fdd\u5b58\uff0c\u8bf7\u957f\u6309\u56fe\u7247\u9009\u62e9\u201c\u4fdd\u5b58\u56fe\u7247\u201d'; return; }
+  try {
+    await navigator.share({ files: [file], title: 'i7 PROFILE' }); closeExportImagePreview(); elements.exportStatus.textContent = '\u5df2\u6253\u5f00\u7cfb\u7edf\u4fdd\u5b58\u6216\u5206\u4eab\u9762\u677f';
+  } catch (error) {
+    if (error && error.name === 'AbortError') { elements.exportStatus.textContent = '\u5df2\u53d6\u6d88\u7cfb\u7edf\u4fdd\u5b58\uff0c\u4ecd\u53ef\u957f\u6309\u56fe\u7247\u4fdd\u5b58'; return; }
+    console.error(error); elements.exportStatus.textContent = '\u7cfb\u7edf\u4fdd\u5b58\u4e0d\u53ef\u7528\uff0c\u8bf7\u957f\u6309\u56fe\u7247\u4fdd\u5b58';
   }
-  triggerJpegDownload(pending); pendingJpegExport = null; elements.exportPng.textContent = '\u5bfc\u51fa JPG'; elements.exportStatus.textContent = '\u5df2\u89e6\u53d1 JPG \u4e0b\u8f7d';
 }
 
 async function exportPng() {
-  if (pendingJpegExport) { await savePendingJpegExport(); return; }
+  if (pendingJpegExport) { openExportImagePreview(); return; }
   if (typeof window.html2canvas !== 'function') { elements.exportStatus.textContent = '\u5bfc\u51fa\u7ec4\u4ef6\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5'; return; }
   elements.exportPng.disabled = true; elements.exportStatus.textContent = '\u6b63\u5728\u751f\u6210 JPG\u2026';
   try {
@@ -556,8 +563,9 @@ async function exportPng() {
     const width = Math.max(elements.card.scrollWidth, elements.card.offsetWidth, 1); const height = Math.max(elements.card.scrollHeight, elements.card.offsetHeight, 1);
     const maxPixels = 4000000; const maxDimension = 4096; const scale = Math.min(2, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
     const canvas = await window.html2canvas(elements.card, { backgroundColor: '#ffffff', scale: scale, useCORS: true, logging: false }); const blob = await canvasToExportBlob(canvas);
-    const name = (state.name.trim() || 'i7-profile').replace(/[\\/:*?"<>|]/g, '_');
-    pendingJpegExport = { blob: blob, name: `${name}-profile.jpg` }; elements.exportPng.textContent = '\u4fdd\u5b58 JPG'; elements.exportStatus.textContent = scale < 2 ? '\u6761\u76ee\u8f83\u591a\uff0c\u5df2\u4f18\u5316 JPG\uff1b\u8bf7\u518d\u6b21\u70b9\u51fb\u201c\u4fdd\u5b58 JPG\u201d' : 'JPG \u5df2\u751f\u6210\uff0c\u8bf7\u70b9\u51fb\u201c\u4fdd\u5b58 JPG\u201d';
+    const name = (state.name.trim() || 'i7-profile').replace(/[\\/:*?"<>|]/g, '_'); pendingJpegExport = { blob: blob, name: `${name}-profile.jpg` };
+    elements.exportPng.textContent = '\u67e5\u770b JPG'; elements.exportStatus.textContent = scale < 2 ? '\u6761\u76ee\u8f83\u591a\uff0c\u5df2\u4f18\u5316 JPG\uff1b\u8bf7\u957f\u6309\u5927\u56fe\u4fdd\u5b58' : 'JPG \u5df2\u751f\u6210\uff0c\u8bf7\u957f\u6309\u5927\u56fe\u4fdd\u5b58';
+    if (!openExportImagePreview()) elements.exportStatus.textContent = '\u751f\u6210\u6210\u529f\uff0c\u4f46\u65e0\u6cd5\u6253\u5f00\u56fe\u7247\u9884\u89c8\uff1b\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5';
   } catch (error) {
     console.error(error); elements.exportStatus.textContent = '\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5';
   } finally { elements.exportPng.disabled = false; }
@@ -607,6 +615,8 @@ elements.cancelColorLegend.addEventListener('click', closeColorLegendDialog);
 elements.confirmColorLegend.addEventListener('click', addColorLegend);
 elements.legendNoteInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addColorLegend(); } });
 elements.exportPng.addEventListener('click', exportPng);
+if (elements.saveExportImage) elements.saveExportImage.addEventListener('click', savePendingJpegExport);
+if (elements.closeExportImage) elements.closeExportImage.addEventListener('click', closeExportImagePreview);
 elements.confirmDisclaimer.addEventListener('click', () => { elements.disclaimerDialog.hidden = true; document.body.classList.remove('disclaimer-open'); });
 document.querySelector('#resetButton').addEventListener('click', reset);
 
