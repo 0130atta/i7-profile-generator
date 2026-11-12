@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#eef4ff" />
+    <title>i7 属性卡生成器</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="site-header">
+        <div>
+          <p class="eyebrow">IDOLiSH7 FAN TOOL</p>
+          <h1>i7 属性卡生成器</h1>
+        </div>
+        <p class="header-note">非官方同人小工具 · 基础版</p>
+      </header>
+
+      <div class="mobile-view-switcher" role="tablist" aria-label="切换工作区域">
+        <button type="button" role="tab" aria-selected="true" data-workspace-view="editor">工作台</button>
+        <button type="button" role="tab" aria-selected="false" data-workspace-view="preview">预览</button>
+      </div>
+
+      <div class="workspace">
+        <section class="editor" aria-label="属性编辑器">
+          <div class="editor-heading">
+            <h2>编辑资料</h2>
+            <button class="text-button" id="resetButton" type="button">恢复默认</button>
+          </div>
+
+          <section class="panel personal-panel">
+            <div class="panel-title-row">
+              <span class="section-index">01</span>
+              <h3>个人信息</h3>
+              <button class="preview-toggle" type="button" data-preview-module="personal" aria-pressed="true">预览中显示</button>
+            </div>
+            <div class="personal-grid">
+              <label class="avatar-input" for="avatarInput" title="上传头像">
+                <img id="avatarPreview" alt="头像预览" hidden />
+                <span id="avatarPlaceholder"><b>+</b> 上传头像</span>
+              </label>
+              <input id="avatarInput" type="file" accept="image/*" hidden />
+              <div class="form-fields">
+                <label>
+                  <span>昵称 / CN</span>
+                  <input id="nameInput" type="text" maxlength="20" placeholder="输入你的昵称" />
+                </label>
+                <label>
+                  <span>一句话签名</span>
+                  <textarea id="bioInput" maxlength="80" placeholder="例如：今天也为舞台闪闪发光。"></textarea>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title-row">
+              <span class="section-index">02</span>
+              <h3>角色喜好</h3>
+              <span class="hint">选择角色、态度后确认</span>
+              <button class="preview-toggle" type="button" data-preview-module="character" aria-pressed="true">预览中显示</button>
+            </div>
+            <div class="cp-step">
+              <p><b>1</b> 选择角色</p>
+              <div id="characterChips" class="portrait-grid" aria-label="选择角色"></div>
+            </div>
+            <div class="cp-step">
+              <p><b>2</b> 选择态度与颜色</p>
+              <div id="characterAttitudeChips" class="chip-grid" aria-label="选择角色态度"></div>
+              <div class="attitude-controls">
+                <label class="color-picker-label">标签颜色 <input id="characterColorInput" type="color" value="#e15b64" aria-label="角色态度标签颜色" /></label>
+              </div>
+              <div class="custom-row">
+                <input id="characterAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自定义态度词" />
+                <button class="outline-button" id="addCharacterAttitudeButton" type="button">添加</button>
+              </div>
+            </div>
+            <div class="cp-result-row">
+              <div id="characterDraftPreview" class="cp-entry-output" aria-live="polite">请选择角色，再选择态度</div>
+              <button class="primary-button" id="confirmCharacterButton" type="button">确定添加</button>
+            </div>
+            <div class="entry-list-heading">已生成的角色词条</div>
+            <div id="characterEntryList" class="entry-list" aria-live="polite"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title-row">
+              <span class="section-index">03</span>
+              <h3>团体喜好</h3>
+              <span class="hint">选择组合、态度后确认</span>
+              <button class="preview-toggle" type="button" data-preview-module="group" aria-pressed="true">预览中显示</button>
+            </div>
+            <div class="cp-step">
+              <p><b>1</b> 选择组合</p>
+              <div id="groupChips" class="group-logo-grid" aria-label="选择组合"></div>
+            </div>
+            <div class="cp-step">
+              <p><b>2</b> 选择态度与颜色</p>
+              <div id="groupAttitudeChips" class="chip-grid" aria-label="选择组合态度"></div>
+              <div class="attitude-controls">
+                <label class="color-picker-label">标签颜色 <input id="groupColorInput" type="color" value="#e15b64" aria-label="组合态度标签颜色" /></label>
+              </div>
+              <div class="custom-row">
+                <input id="groupAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自定义态度词" />
+                <button class="outline-button" id="addGroupAttitudeButton" type="button">添加</button>
+              </div>
+            </div>
+            <div class="cp-result-row">
+              <div id="groupDraftPreview" class="cp-entry-output" aria-live="polite">请选择组合，再选择态度</div>
+              <button class="primary-button" id="confirmGroupButton" type="button">确定添加</button>
+            </div>
+            <div class="entry-list-heading">已生成的组合词条</div>
+            <div id="groupEntryList" class="entry-list" aria-live="polite"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title-row">
+              <span class="section-index">04</span>
+              <h3>CP 词条生成</h3>
+              <span class="hint">先选左位，再选右位</span>
+              <button class="preview-toggle" type="button" data-preview-module="cp" aria-pressed="true">预览中显示</button>
+            </div>
+            <div class="cp-step">
+              <p><b>1</b> 选择 CP（第一位为左，第二位为右）</p>
+              <div id="cpCharacterPicker" class="portrait-grid cp-portrait-grid" aria-label="选择 CP 配对"></div>
+              <div class="pair-controls" aria-label="CP 左右设置">
+                <button id="cpNonDirectionalToggle" class="outline-button" type="button" aria-pressed="false">左右无差</button>
+                <button id="cpSwapButton" class="outline-button" type="button">转换左右</button>
+              </div>
+            </div>
+            <div class="cp-step">
+              <p id="cpSecondStepTitle"><b>2</b> 选择个人态度</p>
+              <div id="cpAttitudeArea">
+                <div id="cpPreferenceChips" class="chip-grid" aria-label="选择个人态度"></div>
+                <div class="attitude-controls">
+                  <label class="color-picker-label">标签颜色 <input id="cpColorInput" type="color" value="#8a64c8" aria-label="CP 态度标签颜色" /></label>
+                </div>
+                <div class="custom-row">
+                  <input id="cpAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自己的态度词" />
+                  <button class="outline-button" id="addCpAttitudeButton" type="button">添加</button>
+                </div>
+              </div>
+              <div id="cpSingleArea" hidden>
+                <div id="cpSingleStatusChips" class="chip-grid" aria-label="选择单角色固定类型"></div>
+                <div class="custom-row">
+                  <input id="cpSingleCustomInput" type="text" maxlength="16" placeholder="添加自定义固定类型" />
+                  <button class="outline-button" id="addCpSingleCustomButton" type="button">添加</button>
+                </div>
+              </div>
+              <div id="cpTripleArea" hidden>
+                <p class="sub-step-label">组合类型</p>
+                <div id="cpTripleStatusChips" class="chip-grid" aria-label="选择多人组合类型"></div>
+                <div class="custom-row">
+                  <input id="cpTripleCustomInput" type="text" maxlength="16" placeholder="添加自定义组合类型" />
+                  <button class="outline-button" id="addCpTripleCustomButton" type="button">添加</button>
+                </div>
+                <p class="sub-step-label">个人态度</p>
+                <div id="cpTripleAttitudeChips" class="chip-grid" aria-label="选择多人组合态度"></div>
+                <div class="attitude-controls">
+                  <label class="color-picker-label">标签颜色 <input id="cpTripleColorInput" type="color" value="#8a64c8" aria-label="多人组合态度标签颜色" /></label>
+                </div>
+                <div class="custom-row">
+                  <input id="cpTripleAttitudeCustomInput" type="text" maxlength="16" placeholder="添加自定义态度词" />
+                  <button class="outline-button" id="addCpTripleAttitudeButton" type="button">添加</button>
+                </div>
+              </div>
+            </div>
+            <div class="cp-result-row">
+              <div id="cpEntryOutput" class="cp-entry-output" aria-live="polite">请选择左位和右位，再选择个人态度</div>
+              <button class="primary-button" id="generateCpButton" type="button">确定添加</button>
+            </div>
+            <div class="entry-list-heading">已生成的词条</div>
+            <div id="cpEntryList" class="entry-list" aria-live="polite"></div>
+          </section>
+
+          <section class="panel notes-panel">
+            <div class="panel-title-row">
+              <span class="section-index">05</span>
+              <h3>备注栏</h3>
+              <button class="preview-toggle" type="button" data-preview-module="notes" aria-pressed="true">预览中显示</button>
+            </div>
+            <div id="notesEditor" class="notes-editor" aria-live="polite"></div>
+            <button class="add-note-button" id="addNoteButton" type="button">点此增加一条备注栏</button>
+          </section>
+
+        </section>
+
+        <aside class="preview-side" aria-label="属性卡实时预览">
+          <div class="preview-heading">
+            <h2>实时预览</h2>
+            <span class="live-dot">LIVE</span>
+          </div>
+          <div class="preview-frame">
+            <article class="profile-card theme-blue" id="profileCard">
+              <div class="card-top-line"></div>
+              <div class="card-header" id="profileHeader">
+                <div class="preview-avatar" id="cardAvatar">
+                  <span>i7</span>
+                </div>
+                <div class="identity">
+                  <p class="card-kicker">FAN PROFILE</p>
+                  <h2 id="cardName">你的昵称</h2>
+                  <p id="cardBio">在左侧填写信息，生成属于你的属性卡。</p>
+                </div>
+              </div>
+
+              <div class="card-divider" id="profileHeaderDivider"></div>
+
+              <section class="card-section" id="previewCharacterSection">
+                <h3><span>CHARACTER</span><b>角色喜好</b></h3>
+                <div class="preview-entry-list" id="previewCharacter"></div>
+              </section>
+              <section class="card-section" id="previewGroupSection">
+                <h3><span>GROUP</span><b>团体喜好</b></h3>
+                <div class="preview-entry-list" id="previewGroup"></div>
+              </section>
+              <section class="card-section" id="previewCpSection">
+                <h3><span>PAIRING</span><b>角色 / CP 词条</b></h3>
+                <div class="preview-entry-list" id="previewCp"></div>
+              </section>
+              <section class="card-section" id="previewNotesSection">
+                <h3><span>NOTES</span><b>备注</b></h3>
+                <div class="preview-notes" id="previewNotes"></div>
+              </section>
+
+              <footer class="card-footer">
+                <span>i7 PROFILE</span>
+                <span>made by atta</span>
+              </footer>
+            </article>
+          </div>
+          <p class="preview-tip">支持资料填写、偏好词条和拖动排序，右侧会实时同步预览。</p>
+        </aside>
+      </div>
+    </main>
+
+    <template id="chipTemplate">
+      <button class="chip" type="button" aria-pressed="false"></button>
+    </template>
+    <script src="app.js"></script>
+  </body>
+</html>
