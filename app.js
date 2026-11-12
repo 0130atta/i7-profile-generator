@@ -511,16 +511,26 @@ function renderNotesEditor() {
 function addNote() { state.notes.push({ id: entryId(), title: '', text: '' }); renderNotesEditor(); renderPreview(); }
 
 async function exportPng() {
-  if (typeof window.html2canvas !== 'function') { elements.exportStatus.textContent = '导出组件加载失败，请刷新后重试'; return; }
-  elements.exportPng.disabled = true; elements.exportStatus.textContent = '正在生成 PNG…';
+  if (typeof window.html2canvas !== 'function') { elements.exportStatus.textContent = '\u5bfc\u51fa\u7ec4\u4ef6\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5'; return; }
+  elements.exportPng.disabled = true; elements.exportStatus.textContent = '\u6b63\u5728\u751f\u6210 PNG\u2026';
   try {
-    if (document.fonts?.ready) await document.fonts.ready;
-    const canvas = await window.html2canvas(elements.card, { backgroundColor: null, scale: 3, useCORS: true, logging: false });
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const width = Math.max(elements.card.scrollWidth, elements.card.offsetWidth, 1);
+    const height = Math.max(elements.card.scrollHeight, elements.card.offsetHeight, 1);
+    const maxPixels = 12000000; const maxDimension = 8192;
+    const scale = Math.min(3, Math.sqrt(maxPixels / (width * height)), maxDimension / Math.max(width, height));
+    const canvas = await window.html2canvas(elements.card, { backgroundColor: null, scale: scale, useCORS: true, logging: false });
     const link = document.createElement('a'); const name = (state.name.trim() || 'i7-profile').replace(/[\\/:*?"<>|]/g, '_');
-    link.href = canvas.toDataURL('image/png'); link.download = `${name}-profile.png`; document.body.append(link); link.click(); link.remove();
-    elements.exportStatus.textContent = 'PNG 已下载';
+    const download = (url) => {
+      const link = document.createElement('a'); link.href = url; link.download = `${name}-profile.png`; document.body.append(link); link.click(); link.remove();
+      if (url.indexOf('blob:') === 0) setTimeout(() => URL.revokeObjectURL(url), 0);
+    };
+    if (typeof canvas.toBlob === 'function') {
+      await new Promise((resolve, reject) => canvas.toBlob((blob) => { if (!blob) { reject(new Error('\u65e0\u6cd5\u751f\u6210 PNG')); return; } download(URL.createObjectURL(blob)); resolve(); }, 'image/png'));
+    } else download(canvas.toDataURL('image/png'));
+    elements.exportStatus.textContent = scale < 3 ? '\u6761\u76ee\u8f83\u591a\uff0c\u5df2\u4f18\u5316\u5e76\u4e0b\u8f7d PNG' : 'PNG \u5df2\u4e0b\u8f7d';
   } catch (error) {
-    console.error(error); elements.exportStatus.textContent = '导出失败，请刷新后重试';
+    console.error(error); elements.exportStatus.textContent = '\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5';
   } finally { elements.exportPng.disabled = false; }
 }
 
