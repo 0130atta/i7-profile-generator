@@ -231,6 +231,10 @@
             </article>
           </div>
           <p class="preview-tip">支持资料填写、偏好词条和拖动排序，右侧会实时同步预览。</p>
+          <div class="export-actions">
+            <button class="export-button" id="exportPngButton" type="button">导出 PNG</button>
+            <span class="export-status" id="exportStatus" aria-live="polite"></span>
+          </div>
         </aside>
       </div>
     </main>
@@ -238,6 +242,7 @@
     <template id="chipTemplate">
       <button class="chip" type="button" aria-pressed="false"></button>
     </template>
+    <script src="vendor/html2canvas.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
